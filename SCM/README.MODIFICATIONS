@@ -1,0 +1,1873 @@
+This version of SCM has been MODIFIED from the original 4e1 distribution by
+Kenneth B. Russell <kbrussel@media.mit.edu>.
+
+This file contains the diffs with the original version of scm4e1. If you
+prefer, you can obtain that version and apply these diffs to create a
+version of SCM which supports what are currently Header2Scheme-specific
+constructs. Note that some of the files named in this diff file are not in
+the original distribution.
+
+Only in scm4e1: ClassController.c++
+Only in scm4e1: ClassController.h
+Only in scm4e1: ClassController.o
+Only in scm4e1: Hobbit
+diff -c scm4e1_original/Init.scm scm4e1/Init.scm
+*** scm4e1_original/Init.scm	Fri Apr 15 00:21:14 1994
+--- scm4e1/Init.scm	Mon Jan  6 18:16:43 1997
+***************
+*** 292,325 ****
+  (define slib:form-feed #\page)
+  (define slib:eval eval)
+  
+  ;;; Load.
+! (define (scm:load file . libs)
+!   (define sfs (scheme-file-suffix))
+!   (define cep (current-error-port))
+!   (define filesuf file)
+!   (define hss (has-suffix? file sfs))
+!   (cond ((> (verbose) 1)
+! 	 (display ";loading " cep) (write file cep) (newline cep)))
+!   (force-output cep)
+!   (or (and (defined? link:link) (not hss)
+! 	   (or (apply link:link file libs)
+! 	       (and link:able-suffix
+! 		    (let ((fs (string-append file link:able-suffix)))
+! 		      (cond ((not (file-exists? fs)) #f)
+! 			    ((apply link:link fs libs) (set! filesuf fs) #t)
+! 			    (else #f))))))
+!       (and (null? libs)
+! 	   (or (try-load file)
+! 	       ;;HERE is where the suffix gets specified
+! 	       (and (not hss)
+! 		    (begin (set! filesuf (string-append file sfs))
+! 			   (try-load filesuf)))))
+!       (and (procedure? could-not-open) (could-not-open) #f)
+!       (error "LOAD couldn't find file " file))
+!   (errno 0)
+!   (cond ((> (verbose) 1)
+! 	 (display ";done loading " cep) (write filesuf cep) (newline cep)
+! 	 (force-output cep))))
+  (define load scm:load)
+  (define slib:load load)
+  
+--- 292,417 ----
+  (define slib:form-feed #\page)
+  (define slib:eval eval)
+  
++ ;; Scoping for loads -- UNIX only. kbrussel@media.mit.edu 1/97
++ (define *file-load-scope* '())
++ (define (absolute-path? path)
++   (if (not (string? path))
++       #f
++       (if (< (string-length path) 1)
++ 	  #f
++ 	  (char=? #\/ (string-ref path 0)))))
++ (define (file-load-vicinity)
++   (define (file-load-vicinity-aux path-string file-load-scope)
++     (if (null? file-load-scope)
++ 	path-string
++ 	(if (absolute-path? (car file-load-scope))
++ 	    (string-append (car file-load-scope) path-string)
++ 	    (file-load-vicinity-aux (string-append (car file-load-scope)
++ 						   path-string)
++ 				    (cdr file-load-scope)))))
++   (file-load-vicinity-aux "" *file-load-scope*))
++ 
++ (define (last-slash-posn pathname)
++   (define (lsp-aux pathname index)
++     (if (< index 0) 
++ 	#f
++ 	(if (char=? #\/ (string-ref pathname index))
++ 	    index
++ 	    (lsp-aux pathname (- index 1)))))
++   (lsp-aux pathname (- (string-length pathname) 1)))
++ 
++ (define (file-path pathname)
++   (let ((last-index (last-slash-posn pathname)))
++     (if (not last-index)
++ 	""
++ 	(substring pathname 0 (1+ last-index)))))
++ (define (file-name pathname)
++   (let ((last-index (last-slash-posn pathname)))
++     (if (not last-index)
++ 	pathname
++ 	(substring pathname (1+ last-index) (string-length pathname)))))
++ 
++ (define (push-file-scope pathname)
++   (set! *file-load-scope* (cons (file-path pathname)
++ 				*file-load-scope*)))
++ (define (pop-file-scope)
++   (set! *file-load-scope* (cdr *file-load-scope*)))
++ 
+  ;;; Load.
+! ;;; NOTE that scoped loading is only enabled if getcwd exists.
+! (if (defined? getcwd)
+!     (define (scm:load file . libs)
+!       (define sfs (scheme-file-suffix))
+!       (define cep (current-error-port))
+!       (define filesuf file)
+!       (define hss (has-suffix? file sfs))
+!       (dynamic-wind
+!        (lambda ()
+! 	 (if (null? *file-load-scope*)
+! 	     (set! *file-load-scope* 
+! 		   (cons (string-append (getcwd) "/")
+! 			 *file-load-scope*)))
+! 	 (push-file-scope file)
+! 	 (chdir (file-load-vicinity)))
+!        (lambda ()
+! 	 (cond ((> (verbose) 1)
+! 		(display ";loading " cep) (write file cep) (newline cep)))
+! 	 (force-output cep)
+! 	 (set! file (file-name file))
+! 	 (or (and (defined? link:link) (not hss)
+! 		  (or (apply link:link file libs)
+! 		      (and link:able-suffix
+! 			   (let ((fs (string-append file link:able-suffix)))
+! 			     (cond ((not (file-exists? fs)) #f)
+! 				   ((apply link:link fs libs) (set! filesuf fs) #t)
+! 				   (else #f))))))
+! 	     (and (null? libs)
+! 		  (or (try-load file)
+! 		      ;;HERE is where the suffix gets specified
+! 		      (and (not hss)
+! 			   (begin (set! filesuf (string-append file sfs))
+! 				  (try-load filesuf)))))
+! 	     (and (procedure? could-not-open) (could-not-open) #f)
+! 	     (error "LOAD couldn't find file " file))
+! 	 (errno 0)
+! 	 (cond ((> (verbose) 1)
+! 		(display ";done loading " cep) (write filesuf cep) (newline cep)
+! 		(force-output cep))))
+!        (lambda ()	 
+! 	 (pop-file-scope)
+! 	 (chdir (file-load-vicinity))
+! 	 (if (and (pair? *file-load-scope*)
+! 		  (null? (cdr *file-load-scope*)))
+! 	     (set! *file-load-scope* (cdr *file-load-scope*))))
+!        ))
+!     (define (scm:load file . libs)
+!       (define sfs (scheme-file-suffix))
+!       (define cep (current-error-port))
+!       (define filesuf file)
+!       (define hss (has-suffix? file sfs))
+!       (cond ((> (verbose) 1)
+! 	     (display ";loading " cep) (write file cep) (newline cep)))
+!       (force-output cep)
+!       (or (and (defined? link:link) (not hss)
+! 	       (or (apply link:link file libs)
+! 		   (and link:able-suffix
+! 			(let ((fs (string-append file link:able-suffix)))
+! 			  (cond ((not (file-exists? fs)) #f)
+! 				((apply link:link fs libs) (set! filesuf fs) #t)
+! 				(else #f))))))
+! 	  (and (null? libs)
+! 	       (or (try-load file)
+! 		   ;;HERE is where the suffix gets specified
+! 		   (and (not hss)
+! 			(begin (set! filesuf (string-append file sfs))
+! 			       (try-load filesuf)))))
+! 	  (and (procedure? could-not-open) (could-not-open) #f)
+! 	  (error "LOAD couldn't find file " file))
+!       (errno 0)
+!       (cond ((> (verbose) 1)
+! 	     (display ";done loading " cep) (write filesuf cep) (newline cep)
+! 	     (force-output cep))))
+!     )
+  (define load scm:load)
+  (define slib:load load)
+  
+Only in scm4e1: Init.scm.athena
+Only in scm4e1: InitAddendum.scm
+diff -c scm4e1_original/Link.scm scm4e1/Link.scm
+*** scm4e1_original/Link.scm	Tue Apr  5 23:58:12 1994
+--- scm4e1/Link.scm	Fri Nov 10 01:17:01 1995
+***************
+*** 6,13 ****
+    (let ((default "cc -c"))	;-O removed for HP-UX self-compile
+      (case (software-type)
+        ((unix) (if (memq 'sun-dl *features*)
+! 		  "gcc -g -O -fpic -c" ; If you have problems change -fpic to
+! 		                       ; -fPIC (see GCC info pages).
+  		  default))
+        (else default))))
+  
+--- 6,15 ----
+    (let ((default "cc -c"))	;-O removed for HP-UX self-compile
+      (case (software-type)
+        ((unix) (if (memq 'sun-dl *features*)
+! 		  "cc -c"              ; Modified for IRIX 11/5/95
+! 		                       ; kbrussel@media.mit.edu
+! ;		  "gcc -g -O -fpic -c" ; If you have problems change -fpic to
+! ;		                       ; -fPIC (see GCC info pages).
+  		  default))
+        (else default))))
+  
+***************
+*** 40,46 ****
+  ;;; The following is the magic incantation used to produce dynamically
+  ;;; linkable object files under SunOS 4.1.x.  Under Solaris 2.x I
+  ;;; believe it'll be something like "ld -G -ztext -o".
+! 			"; ld -assert pure-text -o "
+  			(descmify file) scm:object-suffix " " tmp
+  			"; rm -f " tmp)))
+  	  (do-compile sunstr))
+--- 42,50 ----
+  ;;; The following is the magic incantation used to produce dynamically
+  ;;; linkable object files under SunOS 4.1.x.  Under Solaris 2.x I
+  ;;; believe it'll be something like "ld -G -ztext -o".
+! 
+! ;;;  Modified for IRIX kbrussel@media.mit.edu 11/5/95
+! 			"; ld -shared -o "
+  			(descmify file) scm:object-suffix " " tmp
+  			"; rm -f " tmp)))
+  	  (do-compile sunstr))
+Only in scm4e1: LoadScopeTest
+diff -c scm4e1_original/Makefile scm4e1/Makefile
+*** scm4e1_original/Makefile	Mon Nov  7 11:53:30 1994
+--- scm4e1/Makefile	Mon Nov  9 23:24:34 1998
+***************
+*** 33,39 ****
+  #CFLAGS=-O
+  #CC = cc -hvector2 -hscalar2		#for UNICOS, inlining breaks gc.
+  
+! CC = gcc -g -O2 -Wall
+  #CC = gcc -O2 -traditional
+  LD = ld
+  
+--- 33,53 ----
+  #CFLAGS=-O
+  #CC = cc -hvector2 -hscalar2		#for UNICOS, inlining breaks gc.
+  
+! LOCALINCLUDES = -I.  \
+! 		-I../LinkedList
+! 
+! LOCALLIBS = 	-L.  \
+! 		-L../LinkedList/lib/$(MACHTYPE) \
+! 		-lSLList -lInventor
+! 
+! # o32 opts
+! SGIFLAGS = -o32
+! # n32 opts
+! #SGIFLAGS = -n32
+! CFLAGS = -g -cckr $(SGIFLAGS) -D__STDC__ $(LOCALINCLUDES)
+! C++FLAGS = -g $(SGIFLAGS) -D__STDC__ $(LOCALINCLUDES)
+! CC = cc
+! C++ = CC
+  #CC = gcc -O2 -traditional
+  LD = ld
+  
+***************
+*** 41,47 ****
+  # -DFLOATS turns on support for inexact numbers.
+  # -DENGNOT for engineering notation instead of scientific notation.
+  
+! FFLAGS=-DFLOATS -DENGNOT
+  
+  # append any names of user extension files
+  # -lansi for SCO and XENIX
+--- 55,61 ----
+  # -DFLOATS turns on support for inexact numbers.
+  # -DENGNOT for engineering notation instead of scientific notation.
+  
+! FFLAGS=-DFLOATS -DSUN_DL
+  
+  # append any names of user extension files
+  # -lansi for SCO and XENIX
+***************
+*** 67,72 ****
+--- 81,114 ----
+  #XFILES = setjump.o #for Cray YMP 
+  #XFILES = sc2.o
+  
++ XFILES= SCMGlobalDispatch.o ClassController.o StringList.o Scheme.o hash.o dynl.o number-test.o
++ 
++ default: libscm.a
++ 
++ athena:
++ 	make -f Makefile.athena libscm.a
++ 
++ athenascm:
++ 	make -f Makefile.athena scm
++ 
++ SCMGlobalDispatch.o: SCMGlobalDispatch.c++
++ 	$(C++) $(C++FLAGS) $(LOCALINCLUDES) -c $(FFLAGS) $(DFLAG) $(INITS) SCMGlobalDispatch.c++
++ 
++ ClassController.o: ClassController.c++
++ 	$(C++) $(C++FLAGS) $(LOCALINCLUDES) -c $(FFLAGS) $(DFLAG) $(INITS) ClassController.c++
++ 
++ StringList.o: StringList.c++
++ 	$(C++) $(C++FLAGS) $(LOCALINCLUDES) -c $(FFLAGS) $(DFLAG) $(INITS) StringList.c++
++ 
++ Scheme.o: Scheme.c++
++ 	$(C++) $(C++FLAGS) $(LOCALINCLUDES) -c $(FFLAGS) $(DFLAG) $(INITS) Scheme.c++
++ 
++ hash.o: hash.c++
++ 	$(C++) $(C++FLAGS) $(LOCALINCLUDES) -c $(FFLAGS) $(DFLAG) $(INITS) hash.c++
++ 
++ number-test.o: number-test.c
++ 	$(CC) $(CFLAGS) $(LOCALINCLUDES) -c $(FFLAGS) $(DFLAG) $(INITS) number-test.c
++ 
+  #you should not need to change below this line.
+  
+  DFLAG = -DIMPLINIT=\"$(IMPLINIT)\"
+***************
+*** 128,136 ****
+  	mv scm.o dscm.o
+  
+  scm:	$(ffiles) fscm.o
+! 	$(CC) -o scm $(ffiles) fscm.o $(LIBS)
+! fscm.o:	scm.c scm.h scmfig.h patchlvl.h
+! 	$(CC) $(CFLAGS) -c $(FFLAGS) $(DFLAG) $(INITS) scm.c
+  	mv scm.o fscm.o
+  #From: fred@sce.carleton.ca (Fred J Kaudel)
+  #-U, if get can't include machine file errors from sys/signal.h during
+--- 170,178 ----
+  	mv scm.o dscm.o
+  
+  scm:	$(ffiles) fscm.o
+! 	$(C++) -o scm $(ffiles) fscm.o $(LOCALLIBS) $(LIBS)
+! fscm.o:	scm.c++ scm.h scmfig.h patchlvl.h
+! 	$(C++) $(CFLAGS) -c $(FFLAGS) $(DFLAG) $(INITS) scm.c++
+  	mv scm.o fscm.o
+  #From: fred@sce.carleton.ca (Fred J Kaudel)
+  #-U, if get can't include machine file errors from sys/signal.h during
+***************
+*** 174,181 ****
+  subr.o:	subr.c scm.h scmfig.h
+  	$(CC) $(CFLAGS) -c subr.c
+  dynl.o:	dynl.c scm.h scmfig.h
+! #	$(CC) $(CFLAGS) -DSUN_DL -c dynl.c	# -DRTL
+! 	$(CC) $(CFLAGS) -DDLD -c dynl.c
+  		# -DRTL
+  
+  # Now for dynamically loadable files:
+--- 216,223 ----
+  subr.o:	subr.c scm.h scmfig.h
+  	$(CC) $(CFLAGS) -c subr.c
+  dynl.o:	dynl.c scm.h scmfig.h
+! 	$(CC) $(CFLAGS) -DSUN_DL -DSVR4 -c dynl.c	# -DRTL
+! #	$(CC) $(CFLAGS) -DDLD -c dynl.c
+  		# -DRTL
+  
+  # Now for dynamically loadable files:
+***************
+*** 200,211 ****
+  
+  libscm.a:	rtlscm.o $(ffiles)
+  	rm -f libscm.a
+! 	ar rc libscm.a rtlscm.o $(ffiles)
+! 	ranlib libscm.a
+! 
+! rtlscm.o:	scm.c scm.h scmfig.h patchlvl.h
+! 	$(CC) $(CFLAGS) -c $(FFLAGS) -DRTL $(DFLAG) \
+! 	$(INITS)init_user_scm\(\) scm.c -o rtlscm.o
+  
+  scm.doc:	scm.1
+  	nroff -man scm.1 >scm.doc
+--- 242,255 ----
+  
+  libscm.a:	rtlscm.o $(ffiles)
+  	rm -f libscm.a
+! 	ar crs libscm.a rtlscm.o $(ffiles)
+! #	CC -ar -o libscm.a rtlscm.o $(ffiles)
+! #	ar rc libscm.a rtlscm.o $(ffiles)
+! #	ranlib libscm.a
+! 
+! rtlscm.o:	scm.c++ scm.h scmfig.h patchlvl.h
+! 	$(C++) $(C++FLAGS) -c $(FFLAGS) -DRTL $(DFLAG) \
+! 	$(INITS)init_user_scm\(\) scm.c++ -o rtlscm.o
+  
+  scm.doc:	scm.1
+  	nroff -man scm.1 >scm.doc
+Only in scm4e1: Makefile.athena
+Only in scm4e1: Makefile.new
+Only in scm4e1_original: Makefile~
+Only in scm4e1: RCS
+Only in scm4e1: README.MODIFICATIONS
+Only in scm4e1: SCMGlobalDispatch.c++
+Only in scm4e1: SCMGlobalDispatch.h
+Only in scm4e1: SCMGlobalDispatch.o
+Only in scm4e1: Scheme.c++
+Only in scm4e1: Scheme.h
+Only in scm4e1: Scheme.o
+Only in scm4e1: StringList.c++
+Only in scm4e1: StringList.h
+Only in scm4e1: StringList.o
+Only in scm4e1: StringListStruct.h
+Only in scm4e1_original: account.scm~
+Only in scm4e1: count.scm
+Only in scm4e1: dynl.o
+diff -c scm4e1_original/eval.c scm4e1/eval.c
+*** scm4e1_original/eval.c	Mon Apr  4 23:16:34 1994
+--- scm4e1/eval.c	Wed Feb  1 10:54:38 1995
+***************
+*** 350,356 ****
+      SCM *data = VELTS(form);
+      tmp = EOL;
+      for(;--i >= 0;) tmp = cons(data[i],tmp);
+!     return vector(iqq(tmp,env,depth));
+    }
+    if NCONSP(form) return form;
+    tmp = CAR(form);
+--- 350,356 ----
+      SCM *data = VELTS(form);
+      tmp = EOL;
+      for(;--i >= 0;) tmp = cons(data[i],tmp);
+!     return list2vector(iqq(tmp,env,depth));
+    }
+    if NCONSP(form) return form;
+    tmp = CAR(form);
+***************
+*** 1113,1119 ****
+  		}
+  		return res;
+  	}
+! 	args = vector(cons(arg1,args));
+  	ve = VELTS(args);
+  #ifndef RECKLESS
+  	for(i = LENGTH(args)-1; i >= 0; i--)
+--- 1113,1119 ----
+  		}
+  		return res;
+  	}
+! 	args = list2vector(cons(arg1,args));
+  	ve = VELTS(args);
+  #ifndef RECKLESS
+  	for(i = LENGTH(args)-1; i >= 0; i--)
+***************
+*** 1145,1151 ****
+  		}
+  		return UNSPECIFIED;
+  	}
+! 	args = vector(cons(arg1,args));
+  	ve = VELTS(args);
+  #ifndef RECKLESS
+  	for(i = LENGTH(args)-1; i >= 0; i--)
+--- 1145,1151 ----
+  		}
+  		return UNSPECIFIED;
+  	}
+! 	args = list2vector(cons(arg1,args));
+  	ve = VELTS(args);
+  #ifndef RECKLESS
+  	for(i = LENGTH(args)-1; i >= 0; i--)
+Only in scm4e1: feval.o
+Only in scm4e1_original: fib.scm
+Only in scm4e1_original: fib.scm~
+Only in scm4e1: fscl.o
+Only in scm4e1: funif.o
+Only in scm4e1: hash.c++
+Only in scm4e1: hash.h
+Only in scm4e1: hash.o
+Only in scm4e1: hashgrep
+Only in scm4e1: ii_files
+Only in scm4e1: libscm.a
+Only in scm4e1: number-test.c
+Only in scm4e1: number-test.o
+diff -c scm4e1_original/proto.h scm4e1/proto.h
+*** scm4e1_original/proto.h	Thu Mar 31 12:24:50 1994
+--- scm4e1/proto.h	Fri Jan  3 18:50:28 1997
+***************
+*** 179,184 ****
+--- 179,185 ----
+  SCM ltmpnam P((void ));
+  SCM ltmpnam P((void ));
+  SCM lchdir P((SCM str ));
++ SCM lgetcwd P((void ));
+  SCM del_fil P((SCM str ));
+  SCM ren_fil P((SCM oldname , SCM newname ));
+  SCM lisatty P((SCM port ));
+***************
+*** 352,363 ****
+  SCM st_append P((SCM args ));
+  SCM vectorp P((SCM x ));
+  SCM vector_length P((SCM v ));
+! SCM vector P((SCM l ));
+  SCM vector_ref P((SCM v , SCM k ));
+  SCM vector_set P((SCM v , SCM k , SCM obj ));
+  SCM make_vector P((SCM k , SCM fill ));
+  SCM mkbig P((sizet nlen , int sign ));
+! SCM big2long P((SCM b , sizet l ));
+  SCM adjbig P((SCM b , sizet nlen ));
+  SCM normbig P((SCM b ));
+  SCM copybig P((SCM b , int sign ));
+--- 353,364 ----
+  SCM st_append P((SCM args ));
+  SCM vectorp P((SCM x ));
+  SCM vector_length P((SCM v ));
+! SCM list2vector P((SCM l ));
+  SCM vector_ref P((SCM v , SCM k ));
+  SCM vector_set P((SCM v , SCM k , SCM obj ));
+  SCM make_vector P((SCM k , SCM fill ));
+  SCM mkbig P((sizet nlen , int sign ));
+! SCM big2inum P((SCM b , sizet l ));
+  SCM adjbig P((SCM b , sizet nlen ));
+  SCM normbig P((SCM b ));
+  SCM copybig P((SCM b , int sign ));
+Only in scm4e1: ptrepository
+diff -c scm4e1_original/repl.c scm4e1/repl.c
+*** scm4e1_original/repl.c	Fri Apr 15 00:33:12 1994
+--- scm4e1/repl.c	Sat Nov  7 19:22:41 1998
+***************
+*** 36,41 ****
+--- 36,45 ----
+  }
+  #endif
+  
++ /* Hack to allow reentrant calls to repl_driver_once_* functions.
++    -- kbrussel 1/26/96 */
++ int scm_repl_reentrant_call = 0;
++ 
+  /* ttyname() should be defined in <unistd.h>.  But unistd.h is missing
+     on many systems. */
+  char *ttyname();
+***************
+*** 614,620 ****
+  #endif
+  		case '(':
+  			p = lreadparen(tok_buf,port,s_vector);
+! 			return NULLP(p) ? nullvect : vector(p);
+  		case 't': case 'T': return BOOL_T;
+  		case 'f': case 'F': return BOOL_F;
+  		case 'b': case 'B': case 'o': case 'O':
+--- 618,624 ----
+  #endif
+  		case '(':
+  			p = lreadparen(tok_buf,port,s_vector);
+! 			return NULLP(p) ? nullvect : list2vector(p);
+  		case 't': case 'T': return BOOL_T;
+  		case 'f': case 'F': return BOOL_F;
+  		case 'b': case 'B': case 'o': case 'O':
+***************
+*** 1022,1027 ****
+--- 1026,1333 ----
+    }
+  }
+  
++ 
++ SCM repl_driver_once()
++ /*     char *initpath; */
++ {
++   int local_reentrant_test = scm_repl_reentrant_call;
++   scm_repl_reentrant_call = 1;
++ 
++ /*  BASE(rootcont) = (STACKITEM *)&i; */
++   if (!local_reentrant_test)
++     {
++ #ifdef _UNICOS
++       int i;
++ #else
++       long i;
++ #endif
++       i = setjmp(JMPBUF(rootcont));
++     drloop:
++       switch ((int)i) {
++       default:
++ 	{
++ 	  char *name = errmsgs[i-WNA].s_response;
++ 	  if (name) {
++ 	    SCM proc = CDR(intern(name,(sizet)strlen(name)));
++ 	    if NIMP(proc) apply(proc,EOL,EOL);
++ 	  }
++ 	  if ((i = errmsgs[i-WNA].parent_err)) {
++ 	    scm_repl_reentrant_call = local_reentrant_test;
++ 	    if OPOUTPORTP(cur_inp) {	/* This case for curses window */
++ 	      lfflush(cur_outp);
++ 	      if (verbose) lputs(PROMPT,cur_inp);
++ 	      lfflush(cur_inp);
++ 	    }
++ 	    else {
++ 	      if (verbose) lputs(PROMPT,cur_outp);
++ 	      lfflush(cur_outp);
++ 	    }
++ 	    return exitval;  /* goto drloop; */
++ 	  }
++ 	  def_err_response();
++ 	  scm_repl_reentrant_call = local_reentrant_test;	  
++ 	  if OPOUTPORTP(cur_inp) {	/* This case for curses window */
++ 	    lfflush(cur_outp);
++ 	    if (verbose) lputs(PROMPT,cur_inp);
++ 	    lfflush(cur_inp);
++ 	  }
++ 	  else {
++ 	    if (verbose) lputs(PROMPT,cur_outp);
++ 	    lfflush(cur_outp);
++ 	  }
++ 	  return exitval;
++ 	  /*      goto reset_toplvl; */
++ 	}
++       case 0:
++ 	exitval = MAKINUM(EXIT_SUCCESS);
++ 	errjmp_bad = 0;
++ 	errno = 0;
++ 	alrm_deferred = 0;
++ 	sig_deferred = 0;
++ 	ints_disabled = 0;
++ 	/*    init_init(initpath); */	/* load Scheme init files */
++ /*      case -2: */
++       reset_toplvl:
++ 	errjmp_bad = 0;
++ 	alrm_deferred = 0;
++ 	sig_deferred = 0;
++ 	ints_disabled = 0;
++ 	/* need to close loading files here. */
++ 	*loc_loadpath = BOOL_F;
++ 	repl_once();
++       case -2:
++ 	err_pos = (char *)EXIT;
++ 	i = EXIT;
++ 	/*    goto drloop;	*/	/* encountered EOF on stdin */
++ 	scm_repl_reentrant_call = local_reentrant_test;
++ 	if OPOUTPORTP(cur_inp) {	/* This case for curses window */
++ 	  lfflush(cur_outp);
++ 	  if (verbose) lputs(PROMPT,cur_inp);
++ 	  lfflush(cur_inp);
++ 	}
++ 	else {
++ 	  if (verbose) lputs(PROMPT,cur_outp);
++ 	  lfflush(cur_outp);
++ 	}
++ 	return exitval;
++       case -1:
++ 	exit(1);
++ 	/*    return exitval; */
++       case -3:
++ 	scm_repl_reentrant_call = local_reentrant_test;
++ 	if OPOUTPORTP(cur_inp) {	/* This case for curses window */
++ 	  lfflush(cur_outp);
++ 	  if (verbose) lputs(PROMPT,cur_inp);
++ 	  lfflush(cur_inp);
++ 	}
++ 	else {
++ 	  if (verbose) lputs(PROMPT,cur_outp);
++ 	  lfflush(cur_outp);
++ 	}
++ 	return 0;
++       }
++     }
++   else
++     {
++ 	exitval = MAKINUM(EXIT_SUCCESS);
++ 	errjmp_bad = 0;
++ 	errno = 0;
++ 	alrm_deferred = 0;
++ 	sig_deferred = 0;
++ 	ints_disabled = 0;
++ 	errjmp_bad = 0;
++ 	alrm_deferred = 0;
++ 	sig_deferred = 0;
++ 	ints_disabled = 0;
++ 	/* need to close loading files here. */
++ 	*loc_loadpath = BOOL_F;
++ 	repl_once();
++ 	err_pos = (char *)EXIT;
++ /*	i = EXIT; */
++ 	scm_repl_reentrant_call = local_reentrant_test;
++ 	if OPOUTPORTP(cur_inp) {	/* This case for curses window */
++ 	  lfflush(cur_outp);
++ 	  if (verbose) lputs(PROMPT,cur_inp);
++ 	  lfflush(cur_inp);
++ 	}
++ 	else {
++ 	  if (verbose) lputs(PROMPT,cur_outp);
++ 	  lfflush(cur_outp);
++ 	}
++ 	return exitval;
++     }
++ }
++ 
++ SCM repl_driver_once_with_return()
++ /*     char *initpath; */
++ {
++   SCM retval;
++   int local_reentrant_test = scm_repl_reentrant_call;
++   scm_repl_reentrant_call = 1;
++ 
++   if (!local_reentrant_test) {
++ #ifdef _UNICOS
++     int i;
++ #else
++     long i;
++ #endif
++     /*  BASE(rootcont) = (STACKITEM *)&i; */
++     i = setjmp(JMPBUF(rootcont));
++   drloop:
++     switch ((int)i) {
++     default:
++       {
++ 	char *name = errmsgs[i-WNA].s_response;
++ 	if (name) {
++ 	  SCM proc = CDR(intern(name,(sizet)strlen(name)));
++ 	  if NIMP(proc) apply(proc,EOL,EOL);
++ 	}
++ 	if ((i = errmsgs[i-WNA].parent_err)) {
++ 	  scm_repl_reentrant_call = local_reentrant_test;
++ 	  return UNSPECIFIED;  /* goto drloop; */
++ 	}
++ 	def_err_response();
++ 	scm_repl_reentrant_call = local_reentrant_test;
++ 	return UNSPECIFIED;
++ 	/*      goto reset_toplvl; */
++       }
++     case 0:
++       exitval = MAKINUM(EXIT_SUCCESS);
++       errjmp_bad = 0;
++       errno = 0;
++       alrm_deferred = 0;
++       sig_deferred = 0;
++       ints_disabled = 0;
++       /*    init_init(initpath); */	/* load Scheme init files */
++ /*    case -2: */
++     reset_toplvl:
++       errjmp_bad = 0;
++       alrm_deferred = 0;
++       sig_deferred = 0;
++       ints_disabled = 0;
++       /* need to close loading files here. */
++       *loc_loadpath = BOOL_F;
++       retval = repl_once_with_return();
++     case -2:
++       err_pos = (char *)EXIT;
++       i = EXIT;
++       /*    goto drloop;	*/	/* encountered EOF on stdin */
++       scm_repl_reentrant_call = local_reentrant_test;
++       return retval;
++     case -1:
++       exit(1);
++       /*    return exitval; */
++     case -3:
++       scm_repl_reentrant_call = local_reentrant_test;
++       return 0;
++     }
++   } else {
++     exitval = MAKINUM(EXIT_SUCCESS);
++     errjmp_bad = 0;
++     errno = 0;
++     alrm_deferred = 0;
++     sig_deferred = 0;
++     ints_disabled = 0;
++     /*    init_init(initpath); */	/* load Scheme init files */
++     errjmp_bad = 0;
++     alrm_deferred = 0;
++     sig_deferred = 0;
++     ints_disabled = 0;
++     /* need to close loading files here. */
++     *loc_loadpath = BOOL_F;
++     retval = repl_once_with_return();
++     err_pos = (char *)EXIT;
++ /*    i = EXIT; */
++     /*    goto drloop;	*/	/* encountered EOF on stdin */
++     scm_repl_reentrant_call = local_reentrant_test;
++     return retval;
++   }      
++ }
++ 
++ SCM repl_driver_once_with_return_and_eval(SCM x)
++ /*     char *initpath; */
++ {
++   int local_reentrant_test = scm_repl_reentrant_call;
++   scm_repl_reentrant_call = 1;
++ 
++   if (!local_reentrant_test) {
++ #ifdef _UNICOS
++     int i;
++ #else
++     long i;
++ #endif
++     /*  BASE(rootcont) = (STACKITEM *)&i; */
++     i = setjmp(JMPBUF(rootcont));
++   drloop:
++     switch ((int)i) {
++     default:
++       {
++ 	char *name = errmsgs[i-WNA].s_response;
++ 	if (name) {
++ 	  SCM proc = CDR(intern(name,(sizet)strlen(name)));
++ 	  if NIMP(proc) apply(proc,EOL,EOL);
++ 	}
++ 	if ((i = errmsgs[i-WNA].parent_err)) {
++ 	      scm_repl_reentrant_call = local_reentrant_test;
++ 	      return UNSPECIFIED;  /* goto drloop; */
++ 	    }
++ 	def_err_response();
++ 	scm_repl_reentrant_call = local_reentrant_test;
++ 	return UNSPECIFIED;
++ 	/*      goto reset_toplvl; */
++       }
++     case 0:
++       exitval = MAKINUM(EXIT_SUCCESS);
++       errjmp_bad = 0;
++       errno = 0;
++       alrm_deferred = 0;
++       sig_deferred = 0;
++       ints_disabled = 0;
++       /*    init_init(initpath); */	/* load Scheme init files */
++ /*    case -2: */
++     reset_toplvl:
++       errjmp_bad = 0;
++       alrm_deferred = 0;
++       sig_deferred = 0;
++       ints_disabled = 0;
++       /* need to close loading files here. */
++       *loc_loadpath = BOOL_F;
++       x = EVAL(x, (SCM)EOL);
++     case -2:
++       err_pos = (char *)EXIT;
++       i = EXIT;
++       /*    goto drloop;	*/	/* encountered EOF on stdin */
++       scm_repl_reentrant_call = local_reentrant_test;
++       return x;
++     case -1:
++       exit(1);
++       /*    return exitval; */
++     case -3:
++       scm_repl_reentrant_call = local_reentrant_test;
++       return 0;
++     }
++   } else {
++     exitval = MAKINUM(EXIT_SUCCESS);
++     errjmp_bad = 0;
++     errno = 0;
++     alrm_deferred = 0;
++     sig_deferred = 0;
++     ints_disabled = 0;
++     /*    init_init(initpath); */	/* load Scheme init files */
++     errjmp_bad = 0;
++     alrm_deferred = 0;
++     sig_deferred = 0;
++     ints_disabled = 0;
++     /* need to close loading files here. */
++     *loc_loadpath = BOOL_F;
++     x = EVAL(x, (SCM)EOL);
++     err_pos = (char *)EXIT;
++     /*    i = EXIT; */
++     /*    goto drloop;	*/	/* encountered EOF on stdin */
++     return x;
++   }    
++ }
++ 
+  SCM line_num()
+  {
+    return MAKINUM(linum);
+***************
+*** 1187,1192 ****
+--- 1493,1559 ----
+      iprin1(x,cur_outp,1);
+      lputc('\n',cur_outp);
+    }
++ }
++ 
++ void repl_once()
++ {
++   SCM x;
++ /*  repl_report(); */
++ 
++   lcells_allocated = cells_allocated;
++   lmallocated = mallocated;
++   x = lread(cur_inp);
++   rt = INUM(my_time());
++   gc_time_taken = 0;
++   if (EOF_VAL==x) return;
++   if (!CRDYP(cur_inp))	/* assure newline read (and transcripted) */
++     lungetc(lgetc(cur_inp),cur_inp);
++ #ifdef __TURBOC__
++   if ('\n' != CGETUN(cur_inp))
++     if OPOUTPORTP(cur_inp)	/* This case for curses window */
++       {lfflush(cur_outp); newline(cur_inp);}
++     else newline(cur_outp);
++ #endif
++   x = EVAL(x,(SCM)EOL);
++   repl_report();
++   iprin1(x,cur_outp,1);
++   lputc('\n',cur_outp);
++ }
++ 
++ SCM
++ repl_once_with_return()
++ {
++   SCM x;
++ /*  repl_report(); */
++ 
++   lcells_allocated = cells_allocated;
++   lmallocated = mallocated;
++   x = lread(cur_inp);
++   rt = INUM(my_time());
++   gc_time_taken = 0;
++   if (EOF_VAL==x) return;
++   if (!CRDYP(cur_inp))	/* assure newline read (and transcripted) */
++     lungetc(lgetc(cur_inp),cur_inp);
++ #ifdef __TURBOC__
++   if ('\n' != CGETUN(cur_inp))
++     if OPOUTPORTP(cur_inp)	/* This case for curses window */
++       {lfflush(cur_outp); newline(cur_inp);}
++     else newline(cur_outp);
++ #endif
++   x = EVAL(x,(SCM)EOL);
++   repl_report();
++   iprin1(x,cur_outp,1);
++   lputc('\n',cur_outp);
++   if OPOUTPORTP(cur_inp) {	/* This case for curses window */
++     lfflush(cur_outp);
++     if (verbose) lputs(PROMPT,cur_inp);
++     lfflush(cur_inp);
++   }
++   else {
++     if (verbose) lputs(PROMPT,cur_outp);
++     lfflush(cur_outp);
++   }
++   return x;
+  }
+  SCM quit(n)
+  SCM n;
+Only in scm4e1: repl.o
+diff -c scm4e1_original/rgx.c scm4e1/rgx.c
+*** scm4e1_original/rgx.c	Fri Apr 15 10:31:36 1994
+--- scm4e1/rgx.c	Tue Aug 29 23:31:34 1995
+***************
+*** 5,11 ****
+  /* Posix regexp bindings.  */
+  
+  static char rcsid[] =
+!    "$Id: README.MODIFICATIONS,v 1.8 1998/11/11 04:29:32 kbrussel Exp $";
+  
+  static char s_regex[] = "regex";
+  static char s_regcomp[] = "regcomp", s_regerror[] = "regerror";
+--- 5,11 ----
+  /* Posix regexp bindings.  */
+  
+  static char rcsid[] =
+!    "$Id: README.MODIFICATIONS,v 1.8 1998/11/11 04:29:32 kbrussel Exp $";
+  
+  static char s_regex[] = "regex";
+  static char s_regcomp[] = "regcomp", s_regerror[] = "regerror";
+Only in scm4e1: rtlscm.o
+diff -c scm4e1_original/scl.c scm4e1/scl.c
+*** scm4e1_original/scl.c	Fri Apr 15 10:32:08 1994
+--- scm4e1/scl.c	Tue Mar 12 15:31:02 1996
+***************
+*** 346,352 ****
+      }
+    } while (i < len);
+    if (blen * BITSPERDIG/CHAR_BIT <= sizeof(SCM))
+!     if INUMP(res = big2long(res,blen)) return res;
+    if (j==blen) return res;
+    return adjbig(res,blen);
+  }
+--- 346,352 ----
+      }
+    } while (i < len);
+    if (blen * BITSPERDIG/CHAR_BIT <= sizeof(SCM))
+!     if INUMP(res = big2inum(res,blen)) return res;
+    if (j==blen) return res;
+    return adjbig(res,blen);
+  }
+***************
+*** 643,649 ****
+--- 643,651 ----
+  double x,y;
+  {
+    SCM z;
++ #ifndef ALLOCATEZERO
+    if ((y==0.0) && (x==0.0)) return flo0;
++ #endif
+    NEWCELL(z);
+    DEFER_INTS;
+    if (y==0.0) {
+***************
+*** 1065,1071 ****
+  # else
+      ASSERT(NIMP(z) && INEXP(z),z,ARG1,s_zerop);
+  # endif
+!     return (z==flo0) ? BOOL_T : BOOL_F;
+    }
+  #else
+  # ifdef BIGDIG
+--- 1067,1082 ----
+  # else
+      ASSERT(NIMP(z) && INEXP(z),z,ARG1,s_zerop);
+  # endif
+! 
+! /* kbrussel@media.mit.edu 8/30/95 */
+! #ifndef ALLOCATEZERO
+!     return (z==flo0) ? BOOL_T : BOOL_F; 
+! #else
+!     if (CPLXP(z))
+!       return ((REAL(z) == 0.0) && (IMAG(z) == 0.0)) ? BOOL_T : BOOL_F;
+!     if (INEXP(z))
+!       return (REAL(z) == 0.0) ? BOOL_T : BOOL_F;
+! #endif
+    }
+  #else
+  # ifdef BIGDIG
+***************
+*** 1421,1427 ****
+        if BIGP(x) {
+  	x = copybig(x,!BIGSIGN(x));
+  	return NUMDIGS(x) * BITSPERDIG/CHAR_BIT <= sizeof(SCM) ?
+! 	  big2long(x,NUMDIGS(x)) : x;
+        }
+  # endif
+        ASRTGO(INEXP(x),badx);
+--- 1432,1438 ----
+        if BIGP(x) {
+  	x = copybig(x,!BIGSIGN(x));
+  	return NUMDIGS(x) * BITSPERDIG/CHAR_BIT <= sizeof(SCM) ?
+! 	  big2inum(x,NUMDIGS(x)) : x;
+        }
+  # endif
+        ASRTGO(INEXP(x),badx);
+***************
+*** 1484,1490 ****
+      if UNBNDP(y) {
+        x = copybig(x,!BIGSIGN(x));
+        return NUMDIGS(x) * BITSPERDIG/CHAR_BIT <= sizeof(SCM) ?
+! 		big2long(x,NUMDIGS(x)) : x;
+      }
+      if INUMP(y) {
+  #ifndef DIGSTOOBIG
+--- 1495,1501 ----
+      if UNBNDP(y) {
+        x = copybig(x,!BIGSIGN(x));
+        return NUMDIGS(x) * BITSPERDIG/CHAR_BIT <= sizeof(SCM) ?
+! 		big2inum(x,NUMDIGS(x)) : x;
+      }
+      if INUMP(y) {
+  #ifndef DIGSTOOBIG
+***************
+*** 2338,2344 ****
+  	{s_str2list,string2list},
+  	{"list->string",string},
+  	{s_st_copy,string_copy},
+! 	{"list->vector",vector},
+  	{s_vect2list,vector2list},
+  	{s_system,lsystem},
+  	{s_getenv,lgetenv},
+--- 2349,2355 ----
+  	{s_str2list,string2list},
+  	{"list->string",string},
+  	{s_st_copy,string_copy},
+! 	{"list->vector",list2vector},
+  	{s_vect2list,vector2list},
+  	{s_system,lsystem},
+  	{s_getenv,lgetenv},
+Only in scm4e1: scm
+Only in scm4e1_original: scm.c
+Only in scm4e1: scm.c++
+Only in scm4e1: scm.c++.BACKUP
+Only in scm4e1_original: scm.doc
+diff -c scm4e1_original/scm.h scm4e1/scm.h
+*** scm4e1_original/scm.h	Wed Mar 23 00:17:58 1994
+--- scm4e1/scm.h	Tue Mar 12 15:31:28 1996
+***************
+*** 1,3 ****
+--- 1,6 ----
++ #ifndef __SCM__
++ #define __SCM__
++ 
+  /* Scheme implementation intended for JACAL.
+     Copyright (C) 1990, 1991, 1992, 1993, 1994 Aubrey Jaffer.
+  
+***************
+*** 27,44 ****
+  
+  typedef long SCM;
+  typedef struct {SCM car,cdr;} cell;
+  typedef struct {long sname;SCM (*cproc)();} subr;
+  typedef struct {char *string;SCM (*cproc)();} iproc;
+  
+  #include <stdio.h>
+  #include "scmfig.h"
+  
+  typedef struct {
+!     SCM (*mark)();
+!     sizet (*free)();
+!     int (*print)();
+!     SCM (*equalp)();
+  } smobfuns;
+  
+  typedef struct {
+      SCM (*mark)();
+--- 30,61 ----
+  
+  typedef long SCM;
+  typedef struct {SCM car,cdr;} cell;
++ #ifdef __cplusplus
++ typedef struct {long sname;SCM (*cproc)(SCM, ...);} subr;
++ typedef struct {char *string;SCM (*cproc)(SCM, ...);} iproc;
++ #else
+  typedef struct {long sname;SCM (*cproc)();} subr;
+  typedef struct {char *string;SCM (*cproc)();} iproc;
++ #endif
+  
+  #include <stdio.h>
+  #include "scmfig.h"
+  
++ #ifdef __cplusplus
+  typedef struct {
+!     SCM (*mark)(PROTO);
+!     sizet (*free)(CELLPTR);
+!     int (*print)(SCM, SCM, int);
+!     SCM (*equalp)(SCM, SCM);
+! } smobfuns;
+! #else
+! typedef struct {
+!     SCM (*mark)(PROTO);
+!     sizet (*free)(PROTO);
+!     int (*print)(SCM, SCM, int);
+!     SCM (*equalp)(SCM, SCM);
+  } smobfuns;
++ #endif
+  
+  typedef struct {
+      SCM (*mark)();
+***************
+*** 181,186 ****
+--- 198,208 ----
+  #define TYP16(x) (0xffff & (int)CAR(x))
+  #define TYP16S(x) (0xfeff & (int)CAR(x))
+  #define GCTYP16(x) (0xff7f & (int)CAR(x))
++ #ifdef BIGSMOBS
++ # define TYP32(x) (0x0ffffffff & (int)CAR(x))
++ # define BIGSMOBFLAG 0x8000
++ # define BIGSMOBP(x) (BIGSMOBFLAG & (int)CAR(x))
++ #endif
+  
+  #define NCONSP(x) (1 & (int)CAR(x))
+  #define CONSP(x) (!NCONSP(x))
+***************
+*** 250,255 ****
+--- 272,294 ----
+  #define NUMDIGS(x) ((sizet)(CAR(x)>>16))
+  #define SETNUMDIGS(x,v,t) CAR(x) = (((v)+0L)<<16)+(t)
+  
++ /* Macros for Header2Scheme.
++    Kenneth B. Russell <kbrussel@media.mit.edu> 3/10/96 */
++ #ifdef FLOATS
++ # define FLOATP(x) (NIMP(x) && REALP(x))
++ #else
++ # define FLOATP(x) (0)
++ #endif
++ 
++ #ifdef BIGDIG
++ # define INTP(x) (INUMP(x) || (NIMP(x) && BIGP(x)))
++ #else
++ # define INTP(x) (INUMP(x))
++ #endif
++ 
++ #define C_COMPATIBLE_NUMBERP(x) (INTP(x) || FLOATP(x))
++ 
++ 
+  #define SNAME(x) ((CAR(x)>>8)?(SCM)(heap_org+(CAR(x)>>8)):nullstr)
+  #define SUBRF(x) (((subr *)(SCM2PTR(x)))->cproc)
+  
+***************
+*** 275,281 ****
+  #define FREEP(x) (CAR(x)==tc_free_cell)
+  #define NFREEP(x) (!FREEP(x))
+  
+! #define SMOBNUM(x) (0x0ff & (CAR(x)>>8));
+  #define PTOBNUM(x) (0x0ff & (CAR(x)>>8));
+  
+  /* Aggregated types for dispatch in switch statements. */
+--- 314,325 ----
+  #define FREEP(x) (CAR(x)==tc_free_cell)
+  #define NFREEP(x) (!FREEP(x))
+  
+! #ifndef BIGSMOBS
+! # define SMOBNUM(x) (0x0ff & (CAR(x)>>8)); 
+! #else
+! # define SMOBNUM(x) (BIGSMOBP(x) ? ((0x07FFF80 & (CAR(x) >> 9)) | (0x07F & (CAR(x)) >> 8)) : (0x0FF & (CAR(x)>>8)))
+! /* #define SMOBNUM(x) (((0x0fffc0000 & CAR(x)) >> 10) | ((0x0ff00 & CAR(x)) >> 8)) */
+! #endif
+  #define PTOBNUM(x) (0x0ff & (CAR(x)>>8));
+  
+  /* Aggregated types for dispatch in switch statements. */
+***************
+*** 411,417 ****
+  void han_sig(PROTO), han_alrm(PROTO);
+  char *must_malloc(PROTO), *must_realloc(PROTO);
+  void must_free(PROTO);
+! long ilength(PROTO);
+  
+  extern char s_read[], s_write[], s_newline[];
+  extern char s_make_string[], s_make_vector[], s_list[], s_op_pipe[];
+--- 455,461 ----
+  void han_sig(PROTO), han_alrm(PROTO);
+  char *must_malloc(PROTO), *must_realloc(PROTO);
+  void must_free(PROTO);
+! long ilength(SCM);
+  
+  extern char s_read[], s_write[], s_newline[];
+  extern char s_make_string[], s_make_vector[], s_list[], s_op_pipe[];
+***************
+*** 425,436 ****
+  extern char s_ccl[];
+  #define s_limit (s_ccl+10)
+  
+! SCM hash(), hashv(), hashq(), obhash(), obunhash();
+  unsigned long strhash(), hasher();
+  SCM repl_driver(PROTO), lroom(PROTO);
+  long newsmob(PROTO), newptob(PROTO);
+  void lthrow(PROTO), prinport(PROTO);
+  void repl(PROTO), gc_end(PROTO), gc_start(PROTO), growth_mon(PROTO);
+  void exit_report(PROTO), heap_report(PROTO), stack_report(PROTO);
+  void iprin1(PROTO), intprint(PROTO), iprlist(PROTO), lputc(PROTO);
+  void lputs(PROTO);
+--- 469,485 ----
+  extern char s_ccl[];
+  #define s_limit (s_ccl+10)
+  
+! SCM hash(), hashv(), hashq(), obhash(SCM), obunhash(SCM);
+  unsigned long strhash(), hasher();
+  SCM repl_driver(PROTO), lroom(PROTO);
+  long newsmob(PROTO), newptob(PROTO);
+  void lthrow(PROTO), prinport(PROTO);
+  void repl(PROTO), gc_end(PROTO), gc_start(PROTO), growth_mon(PROTO);
++ void repl_once(PROTO);
++ SCM repl_driver_once();
++ SCM repl_once_with_return(PROTO);
++ SCM repl_driver_once_with_return(PROTO);
++ SCM repl_driver_once_with_return_and_eval(SCM);
+  void exit_report(PROTO), heap_report(PROTO), stack_report(PROTO);
+  void iprin1(PROTO), intprint(PROTO), iprlist(PROTO), lputc(PROTO);
+  void lputs(PROTO);
+***************
+*** 439,456 ****
+  SCM my_time(PROTO), your_time(PROTO);
+  void init_tables(PROTO), init_types(PROTO), init_storage(PROTO),
+    init_subrs(PROTO);
+! void init_features(PROTO), init_iprocs(PROTO), init_scm(PROTO);
+  void init_scl(PROTO), init_io(PROTO), init_repl(PROTO);
+  void final_repl(PROTO);
+  void init_time(PROTO), init_signals(PROTO), ignore_signals(PROTO),
+    unignore_signals(PROTO), init_init(PROTO);
+  void init_eval(PROTO), init_sc2(PROTO), free_storage(PROTO);
+! void init_unif(PROTO), uvprin1(PROTO), add_feature(PROTO);
+  SCM markcdr(PROTO), mark0(PROTO), equal0(PROTO);
+! sizet free0(PROTO);
+! void warn(PROTO), wta(PROTO), everr(PROTO);
+  SCM sysintern(PROTO), intern(PROTO), sym2vcell(PROTO), makstr(PROTO);
+! SCM make_subr(PROTO), makfromstr(PROTO), closure(PROTO);
+  SCM makprom(PROTO), force(PROTO), makarb(PROTO), tryarb(PROTO),
+    relarb(PROTO);
+  SCM ceval(PROTO), prolixity(PROTO);
+--- 488,505 ----
+  SCM my_time(PROTO), your_time(PROTO);
+  void init_tables(PROTO), init_types(PROTO), init_storage(PROTO),
+    init_subrs(PROTO);
+! void init_features(PROTO), init_iprocs(PROTO), init_scm(int);
+  void init_scl(PROTO), init_io(PROTO), init_repl(PROTO);
+  void final_repl(PROTO);
+  void init_time(PROTO), init_signals(PROTO), ignore_signals(PROTO),
+    unignore_signals(PROTO), init_init(PROTO);
+  void init_eval(PROTO), init_sc2(PROTO), free_storage(PROTO);
+! void init_unif(PROTO), uvprin1(PROTO), add_feature(const char *);
+  SCM markcdr(PROTO), mark0(PROTO), equal0(PROTO);
+! sizet free0(CELLPTR);
+! void warn(PROTO), wta(SCM, char *, char *), everr(PROTO);
+  SCM sysintern(PROTO), intern(PROTO), sym2vcell(PROTO), makstr(PROTO);
+! SCM make_subr(PROTO), makfromstr(const char *, sizet), closure(PROTO);
+  SCM makprom(PROTO), force(PROTO), makarb(PROTO), tryarb(PROTO),
+    relarb(PROTO);
+  SCM ceval(PROTO), prolixity(PROTO);
+***************
+*** 464,470 ****
+  SCM consp(PROTO), cons(PROTO), nullp(PROTO);
+  SCM setcar(PROTO), setcdr(PROTO);
+  SCM listp(PROTO), list(PROTO), length(PROTO), append(PROTO);
+! SCM reverse(PROTO), list_ref(PROTO);
+  SCM memq(PROTO), memv(PROTO), member(PROTO), assq(PROTO), assoc(PROTO);
+  SCM symbolp(PROTO), symbol2string(PROTO), string2symbol(PROTO);
+  SCM numberp(PROTO), exactp(PROTO), inexactp(PROTO);
+--- 513,519 ----
+  SCM consp(PROTO), cons(PROTO), nullp(PROTO);
+  SCM setcar(PROTO), setcdr(PROTO);
+  SCM listp(PROTO), list(PROTO), length(PROTO), append(PROTO);
+! SCM list_reverse(PROTO), list_ref(PROTO);
+  SCM memq(PROTO), memv(PROTO), member(PROTO), assq(PROTO), assoc(PROTO);
+  SCM symbolp(PROTO), symbol2string(PROTO), string2symbol(PROTO);
+  SCM numberp(PROTO), exactp(PROTO), inexactp(PROTO);
+***************
+*** 474,481 ****
+    difference(PROTO), divide(PROTO), lquotient(PROTO), absval(PROTO);
+  SCM lremainder(PROTO), modulo(PROTO), lgcd(PROTO), llcm(PROTO),
+    number2string(PROTO), string2number(PROTO), istring2number(PROTO);
+! SCM makdbl(PROTO), istr2flo(PROTO);
+! SCM mkbig(PROTO),long2big(PROTO),big2long(PROTO),dbl2big(PROTO);
+  sizet iint2str(PROTO);
+  SCM copybig(PROTO), adjbig(PROTO), normbig(PROTO);
+  SCM addbig(PROTO), mulbig(PROTO);
+--- 523,530 ----
+    difference(PROTO), divide(PROTO), lquotient(PROTO), absval(PROTO);
+  SCM lremainder(PROTO), modulo(PROTO), lgcd(PROTO), llcm(PROTO),
+    number2string(PROTO), string2number(PROTO), istring2number(PROTO);
+! SCM makdbl(double, double), istr2flo(PROTO);
+! SCM mkbig(PROTO),long2big(PROTO),big2inum(PROTO),dbl2big(PROTO);
+  sizet iint2str(PROTO);
+  SCM copybig(PROTO), adjbig(PROTO), normbig(PROTO);
+  SCM addbig(PROTO), mulbig(PROTO);
+***************
+*** 498,504 ****
+  SCM st_equal(PROTO), stci_equal(PROTO);
+  SCM st_lessp(PROTO), stci_lessp(PROTO), substring(PROTO), st_append(PROTO);
+  
+! SCM vectorp(PROTO), make_vector(PROTO), vector(PROTO), vector_length(PROTO);
+  SCM vector_ref(PROTO), vector_set(PROTO), vector2list(PROTO);
+  SCM for_each(PROTO), procedurep(PROTO), apply(PROTO), map(PROTO);
+  SCM make_cont(PROTO), copytree(PROTO), eval(PROTO);
+--- 547,553 ----
+  SCM st_equal(PROTO), stci_equal(PROTO);
+  SCM st_lessp(PROTO), stci_lessp(PROTO), substring(PROTO), st_append(PROTO);
+  
+! SCM vectorp(PROTO), make_vector(PROTO), list2vector(PROTO), vector_length(PROTO);
+  SCM vector_ref(PROTO), vector_set(PROTO), vector2list(PROTO);
+  SCM for_each(PROTO), procedurep(PROTO), apply(PROTO), map(PROTO);
+  SCM make_cont(PROTO), copytree(PROTO), eval(PROTO);
+***************
+*** 588,591 ****
+--- 637,642 ----
+  
+  #define append2(lst1,lst2) (append(cons2(lst1,lst2,EOL)))
+  #define procedure_pred_(x) (BOOL_T==procedurep(x))
++ #endif
++ 
+  #endif
+diff -c scm4e1_original/scmconfig.h scm4e1/scmconfig.h
+*** scm4e1_original/scmconfig.h	Sun Nov  6 01:10:21 1994
+--- scm4e1/scmconfig.h	Tue Jan 23 15:25:22 1996
+***************
+*** 1,66 ****
+  /* scmconfig.h.in.  Generated automatically from configure.in by autoheader.  */
+  
+  /* Define if on AIX 3.
+     System headers sometimes define this.
+     We just want to avoid a redefinition error message.  */
+  #ifndef _ALL_SOURCE
+! #undef _ALL_SOURCE
+  #endif
+  
+  /* Define to empty if the keyword does not work.  */
+! #undef const
+  
+  /* Define if on MINIX.  */
+! #undef _MINIX
+  
+  /* Define if your C compiler doesn't accept -c and -o together.  */
+! #undef NO_MINUS_C_MINUS_O
+  
+  /* Define if the system does not provide POSIX.1 features except
+     with this defined.  */
+! #undef _POSIX_1_SOURCE
+  
+  /* Define if you need to in order for stat and other things to work.  */
+! #undef _POSIX_SOURCE
+  
+  /* Define as the return type of signal handlers (int or void).  */
+  #define RETSIGTYPE void
+  
+  /* Define if you have the ANSI C header files.  */
+! #undef STDC_HEADERS
+  
+  /* Define if you can safely include both <sys/time.h> and <time.h>.  */
+! #undef TIME_WITH_SYS_TIME
+  
+  /* Define if you have ftime.  */
+! #undef HAVE_FTIME
+  
+  /* Define if you have times.  */
+! #define HAVE_TIMES
+  
+  /* Define if you have the <limits.h> header file.  */
+! #define HAVE_LIMITS_H
+  
+  /* Define if you have the <memory.h> header file.  */
+! #define HAVE_MEMORY_H
+  
+  /* Define if you have the <string.h> header file.  */
+! #define HAVE_STRING_H
+  
+  /* Define if you have the <sys/time.h> header file.  */
+! #define HAVE_SYS_TIME_H
+  
+  /* Define if you have the <sys/timeb.h> header file.  */
+! #undef HAVE_SYS_TIMEB_H
+  
+  /* Define if you have the <sys/times.h> header file.  */
+! #define HAVE_SYS_TIMES_H
+  
+  /* Define if you have the <sys/types.h> header file.  */
+! #define HAVE_SYS_TYPES_H
+  
+  /* Define if you have the <time.h> header file.  */
+! #define HAVE_TIME_H
+  
+  /* Define if you have the <unistd.h> header file.  */
+! #define HAVE_UNISTD_H
+--- 1,67 ----
++ /* scmconfig.h.  Generated automatically by configure.  */
+  /* scmconfig.h.in.  Generated automatically from configure.in by autoheader.  */
+  
+  /* Define if on AIX 3.
+     System headers sometimes define this.
+     We just want to avoid a redefinition error message.  */
+  #ifndef _ALL_SOURCE
+! /* #undef _ALL_SOURCE */
+  #endif
+  
+  /* Define to empty if the keyword does not work.  */
+! /* #undef const */
+  
+  /* Define if on MINIX.  */
+! /* #undef _MINIX */
+  
+  /* Define if your C compiler doesn't accept -c and -o together.  */
+! /* #undef NO_MINUS_C_MINUS_O */
+  
+  /* Define if the system does not provide POSIX.1 features except
+     with this defined.  */
+! /* #undef _POSIX_1_SOURCE */
+  
+  /* Define if you need to in order for stat and other things to work.  */
+! /* #undef _POSIX_SOURCE */
+  
+  /* Define as the return type of signal handlers (int or void).  */
+  #define RETSIGTYPE void
+  
+  /* Define if you have the ANSI C header files.  */
+! #define STDC_HEADERS 1
+  
+  /* Define if you can safely include both <sys/time.h> and <time.h>.  */
+! #define TIME_WITH_SYS_TIME 1
+  
+  /* Define if you have ftime.  */
+! /* #undef HAVE_FTIME */
+  
+  /* Define if you have times.  */
+! #define HAVE_TIMES 1
+  
+  /* Define if you have the <limits.h> header file.  */
+! #define HAVE_LIMITS_H 1
+  
+  /* Define if you have the <memory.h> header file.  */
+! #define HAVE_MEMORY_H 1
+  
+  /* Define if you have the <string.h> header file.  */
+! #define HAVE_STRING_H 1
+  
+  /* Define if you have the <sys/time.h> header file.  */
+! #define HAVE_SYS_TIME_H 1
+  
+  /* Define if you have the <sys/timeb.h> header file.  */
+! /* #undef HAVE_SYS_TIMEB_H */
+  
+  /* Define if you have the <sys/times.h> header file.  */
+! #define HAVE_SYS_TIMES_H 1
+  
+  /* Define if you have the <sys/types.h> header file.  */
+! #define HAVE_SYS_TYPES_H 1
+  
+  /* Define if you have the <time.h> header file.  */
+! #define HAVE_TIME_H 1
+  
+  /* Define if you have the <unistd.h> header file.  */
+! #define HAVE_UNISTD_H 1
+Only in scm4e1: scmconfig.h.new
+Only in scm4e1_original: scmconfig.h~
+diff -c scm4e1_original/scmfig.h scm4e1/scmfig.h
+*** scm4e1_original/scmfig.h	Sun Nov  6 01:08:37 1994
+--- scm4e1/scmfig.h	Thu Jan 11 21:47:16 1996
+***************
+*** 12,17 ****
+--- 12,21 ----
+  #  include <strings.h>
+  # endif
+  
++ /* This important #define doesn't happen if HAVE_CONFIG_H is defined.
++    kbrussel@media.mit.edu 10/16/95 */
++ #define IO_EXTENSIONS
++ 
+  #else /* HAVE_CONFIG_H */
+  
+  # ifdef sequent
+***************
+*** 510,519 ****
+--- 514,525 ----
+  # else
+  #  define sizet unsigned int
+  # endif
++ /*
+  	int alarm();
+  	int system();
+  	int isatty();
+  	int execvp();
++ */
+  #endif
+  
+  /* On VMS, GNU C's errno.h contains a special hack to get link attributes
+***************
+*** 584,588 ****
+--- 590,602 ----
+  #ifdef _DCC
+  # define isascii(c) ((unsigned)(c) <= 0x7f)
+  #endif
++ 
++ /* Kenneth B. Russell -- kbrussel@media.mit.edu */
++ /* BIGSMOBS uses additional bits in the CAR of SMOBs
++    to allow creation of more than 256 SMOBs */
++ #define BIGSMOBS
++ /* ALLOCATEZERO allocates the floating point value 0.0
++    every time it is requested */
++ #define ALLOCATEZERO
+  
+  /* end of automatic C pre-processor definitions */
+Only in scm4e1_original: scmfig.h~
+diff -c scm4e1_original/subr.c scm4e1/subr.c
+*** scm4e1_original/subr.c	Fri Apr 15 10:32:08 1994
+--- scm4e1/subr.c	Tue Mar 12 15:16:00 1996
+***************
+*** 176,182 ****
+  		}
+  	}
+  }
+! SCM reverse(lst)
+  SCM lst;
+  {
+  	SCM res = EOL;
+--- 176,182 ----
+  		}
+  	}
+  }
+! SCM list_reverse(lst)
+  SCM lst;
+  {
+  	SCM res = EOL;
+***************
+*** 1018,1024 ****
+  	ASSERT(NIMP(v) && VECTORP(v),v,ARG1,s_ve_length);
+  	return MAKINUM(LENGTH(v));
+  }
+! SCM vector(l)
+  SCM l;
+  {
+  	SCM res;
+--- 1018,1024 ----
+  	ASSERT(NIMP(v) && VECTORP(v),v,ARG1,s_ve_length);
+  	return MAKINUM(LENGTH(v));
+  }
+! SCM list2vector(l)
+  SCM l;
+  {
+  	SCM res;
+***************
+*** 1082,1088 ****
+  	ALLOW_INTS;
+  	return v;
+  }
+! SCM big2long(b,l)
+       SCM b;
+       sizet l;
+  {
+--- 1082,1088 ----
+  	ALLOW_INTS;
+  	return v;
+  }
+! SCM big2inum(b,l)
+       SCM b;
+       sizet l;
+  {
+***************
+*** 1121,1127 ****
+    BIGDIG *zds = BDIGITS(b);
+    while (nlen-- && !zds[nlen]); nlen++;
+    if (nlen * BITSPERDIG/CHAR_BIT <= sizeof(SCM))
+!     if INUMP(b = big2long(b,(sizet)nlen)) return b;
+    if (NUMDIGS(b)==nlen) return b;
+    return adjbig(b,(sizet)nlen);
+  }
+--- 1121,1127 ----
+    BIGDIG *zds = BDIGITS(b);
+    while (nlen-- && !zds[nlen]); nlen++;
+    if (nlen * BITSPERDIG/CHAR_BIT <= sizeof(SCM))
+!     if INUMP(b = big2inum(b,(sizet)nlen)) return b;
+    if (NUMDIGS(b)==nlen) return b;
+    return adjbig(b,(sizet)nlen);
+  }
+***************
+*** 1398,1404 ****
+   doadj:
+    for(j = ny;j && !zds[j-1];--j) ;
+    if (j * BITSPERDIG <= sizeof(SCM)*CHAR_BIT)
+!     if INUMP(z = big2long(z,j)) return z;
+    return adjbig(z,j);
+  }
+  #endif
+--- 1398,1404 ----
+   doadj:
+    for(j = ny;j && !zds[j-1];--j) ;
+    if (j * BITSPERDIG <= sizeof(SCM)*CHAR_BIT)
+!     if INUMP(z = big2inum(z,j)) return z;
+    return adjbig(z,j);
+  }
+  #endif
+***************
+*** 1421,1427 ****
+  	{"null?",nullp},
+  	{"list?",listp},
+  	{s_length,length},
+! 	{s_reverse,reverse},
+  	{"symbol?",symbolp},
+  	{s_symbol2string,symbol2string},
+  	{s_str2symbol,string2symbol},
+--- 1421,1427 ----
+  	{"null?",nullp},
+  	{"list?",listp},
+  	{s_length,length},
+! 	{s_reverse,list_reverse},
+  	{"symbol?",symbolp},
+  	{s_symbol2string,symbol2string},
+  	{s_str2symbol,string2symbol},
+***************
+*** 1475,1481 ****
+  	{s_append,append},
+  	{s_string,string},
+  	{s_st_append,st_append},
+! 	{s_vector,vector},
+  	{0,0}};
+  
+  static iproc subr2os[] = {
+--- 1475,1481 ----
+  	{s_append,append},
+  	{s_string,string},
+  	{s_st_append,st_append},
+! 	{s_vector,list2vector},
+  	{0,0}};
+  
+  static iproc subr2os[] = {
+Only in scm4e1: subr.o
+diff -c scm4e1_original/sys.c scm4e1/sys.c
+*** scm4e1_original/sys.c	Sun Mar 13 19:22:22 1994
+--- scm4e1/sys.c	Fri Jan  3 18:51:15 1997
+***************
+*** 227,232 ****
+--- 227,242 ----
+    return ans ? BOOL_F : BOOL_T;
+  }
+  #endif
++ /* getcwd added 1/3/97 kbrussel@media.mit.edu */
++ static char s_getcwd[] = "getcwd";
++ SCM lgetcwd()
++ {
++   char path[256];
++   char *ans;
++   SYSCALL(ans = getcwd(path, 256););
++   if (ans == NULL) return BOOL_F;
++   return makfromstr(path, strlen(path));
++ }
+  #ifdef M_SYSV
+  #define remove unlink
+  #endif
+***************
+*** 547,552 ****
+--- 557,563 ----
+  static iproc subr0s[] = {
+  	{"gc",gc},
+  	{"tmpnam",ltmpnam},
++ 	{s_getcwd,lgetcwd},
+  	{0,0}};
+  
+  static iproc subr1s[] = {
+***************
+*** 760,766 ****
+  	return s;
+  }
+  SCM makfromstr(src, len)
+! char *src;
+  sizet len;
+  {
+  	SCM s;
+--- 771,777 ----
+  	return s;
+  }
+  SCM makfromstr(src, len)
+! const char *src;
+  sizet len;
+  {
+  	SCM s;
+***************
+*** 934,950 ****
+  SCM obhash(obj)
+       SCM obj;
+  {
+! 
+  #ifdef BIGDIG
+    long n = SRS(obj,1);
+    if (!FIXABLE(n)) return long2big(n);
+  #endif
+    return (obj<<1)+2L;
+  }
+  
+  SCM obunhash(obj)
+       SCM obj;
+  {
+  #ifdef BIGDIG
+    if (NIMP(obj) && BIGP(obj)) {
+      sizet i = NUMDIGS(obj);
+--- 945,963 ----
+  SCM obhash(obj)
+       SCM obj;
+  {
+! /*
+  #ifdef BIGDIG
+    long n = SRS(obj,1);
+    if (!FIXABLE(n)) return long2big(n);
+  #endif
++ */
+    return (obj<<1)+2L;
+  }
+  
+  SCM obunhash(obj)
+       SCM obj;
+  {
++ /*
+  #ifdef BIGDIG
+    if (NIMP(obj) && BIGP(obj)) {
+      sizet i = NUMDIGS(obj);
+***************
+*** 961,966 ****
+--- 974,980 ----
+      goto comm;
+    }
+  #endif
++ */
+    ASSERT(INUMP(obj),obj,ARG1,s_obunhash);
+    obj = SRS(obj,1) & ~1L;
+   comm:
+***************
+*** 1089,1095 ****
+--- 1103,1114 ----
+       smobfuns *smob;
+  {
+    char *tmp;
++ /* kbrussel@media.mit.edu 8/30/95 */
++ #ifndef BIGSMOBS
+    if (255 <= numsmob) goto smoberr;
++ #else
++   if (8388607 <= numsmob) goto smoberr; /* (2 ^ 23) - 1 */
++ #endif
+    DEFER_INTS;
+    SYSCALL(tmp = (char *)realloc((char *)smobs, (1+numsmob)*sizeof(smobfuns)););
+    if (tmp) {
+***************
+*** 1102,1108 ****
+--- 1121,1139 ----
+    }
+    ALLOW_INTS;
+    if (!tmp) smoberr: wta(MAKINUM((long)numsmob),(char *)NALLOC,"newsmob");
++ /* kbrussel@media.mit.edu 8/30/95 */
++ #ifndef BIGSMOBS
+    return tc7_smob + (numsmob-1)*256;
++ #else
++   if (numsmob <= 128)
++     return (tc7_smob + (numsmob-1)*256);
++   else
++     return (tc7_smob | 
++ 	    (((numsmob - 1) & 0x07F) << 8) | 
++ 	    BIGSMOBFLAG | 
++ 	    (((numsmob - 1) & 0x07FFF80) << 9));
++ /*  return (tc7_smob | (((numsmob-1) & 255) << 8) | (((numsmob-1) & 4194048) << 10)); */
++ #endif
+  }
+  ptobfuns *ptobs;
+  sizet numptob;
+Only in scm4e1: sys.o
+Only in scm4e1_original: time.c~
+Only in scm4e1: time.o
+diff -c scm4e1_original/unif.c scm4e1/unif.c
+*** scm4e1_original/unif.c	Thu Apr 28 23:26:41 1994
+--- scm4e1/unif.c	Fri Nov 10 01:19:05 1995
+***************
+*** 408,414 ****
+        return ra;
+      }
+    }
+!   imap = apply(mapfunc, reverse(inds), EOL);
+    if ARRAYP(oldra) {
+      ASSERT(NIMP(imap) || NULLP(imap), mapfunc, ARG2, s_make_sh_array);
+      imap = aind(oldra,imap);
+--- 408,414 ----
+        return ra;
+      }
+    }
+!   imap = apply(mapfunc, list_reverse(inds), EOL);
+    if ARRAYP(oldra) {
+      ASSERT(NIMP(imap) || NULLP(imap), mapfunc, ARG2, s_make_sh_array);
+      imap = aind(oldra,imap);
+***************
+*** 424,430 ****
+    while (k--) {
+      if (s[k].ubnd > s[k].lbnd) {
+        CAR(indptr) = MAKINUM(INUM(CAR(indptr))+1);
+!       imap = apply(mapfunc, reverse(inds), EOL);
+        if ARRAYP(oldra) {
+  	ASSERT(NIMP(imap) || NULLP(imap), mapfunc, ARG2, s_make_sh_array);
+  	imap = aind(oldra,imap);
+--- 424,430 ----
+    while (k--) {
+      if (s[k].ubnd > s[k].lbnd) {
+        CAR(indptr) = MAKINUM(INUM(CAR(indptr))+1);
+!       imap = apply(mapfunc, list_reverse(inds), EOL);
+        if ARRAYP(oldra) {
+  	ASSERT(NIMP(imap) || NULLP(imap), mapfunc, ARG2, s_make_sh_array);
+  	imap = aind(oldra,imap);
+***************
+*** 1247,1253 ****
+      ASSERT(n>=0, lst, ARG2, s_list2ura);
+      shp = cons(MAKINUM(n),shp);
+    }
+!   ra = dims2ura(reverse(shp), prot, EOL);
+    if NULLP(shp) {
+      ASRTGO(1==ilength(lst),badlst);
+      aset(ra,CAR(lst),EOL);
+--- 1247,1253 ----
+      ASSERT(n>=0, lst, ARG2, s_list2ura);
+      shp = cons(MAKINUM(n),shp);
+    }
+!   ra = dims2ura(list_reverse(shp), prot, EOL);
+    if NULLP(shp) {
+      ASRTGO(1==ilength(lst),badlst);
+      aset(ra,CAR(lst),EOL);
+***************
+*** 1674,1680 ****
+    else {
+      SCM args, *ve;
+      int k;
+!     ras = vector(ras);
+      ve = VELTS(ras);
+      for (; i < n; i++) {
+        args = EOL;
+--- 1674,1680 ----
+    else {
+      SCM args, *ve;
+      int k;
+!     ras = list2vector(ras);
+      ve = VELTS(ras);
+      for (; i < n; i++) {
+        args = EOL;
+***************
+*** 1717,1723 ****
+    else {
+      SCM args, *ve;
+      int k;
+!     ras = vector(ras);
+      ve = VELTS(ras);
+      for (; i < n; i++) {
+        args = EOL;
+--- 1717,1723 ----
+    else {
+      SCM args, *ve;
+      int k;
+!     ras = list2vector(ras);
+      ve = VELTS(ras);
+      for (; i < n; i++) {
+        args = EOL;

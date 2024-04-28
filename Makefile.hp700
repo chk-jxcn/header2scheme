@@ -1,0 +1,7 @@
+all:
+	make -f Makefile.g++
+
+clean:
+	make -f Makefile.g++ clean
+
+# DO NOT DELETE THIS LINE -- make depend depends on it.

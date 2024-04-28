@@ -1,0 +1,4 @@
+#!/bin/csh -fb
+
+mv obj/$MACHTYPE/*.o .
+make -f Makefile.$MACHTYPE $*

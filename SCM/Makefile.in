@@ -1,0 +1,449 @@
+# Copyright (C) 1990, 1991, 1992, 1993 Aubrey Jaffer.	-*- Makefile -*-
+# This file is part of SCM.
+# 
+# SCM is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# SCM is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with SCM; see the file COPYING.  If not, write to the Free
+# Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+
+#
+# Makefile for SCM
+#
+
+# Ultrix 2.2 make doesn't expand the value of VPATH.
+VPATH = @srcdir@
+srcdir = $(VPATH)
+
+CC = @CC@
+
+CFLAGS = @CFLAGS@ -I. -I$(srcdir)
+LDFLAGS = @LDFLAGS@
+
+# Define these for your system as follows:
+#	-DRTL		To create a run-time library only (no
+#			interactive front end).
+#	-DRECKLESS	To turn most SCM error schecking off.
+#	-DCAUTIOUS	To always check the number of arguments to
+#			interpreted closures.
+#	-DIO_EXTENSIONS	To get primitives such as chdir, delete-file,
+#			file-opisition, and pipes.
+#	-DPROMPT=\"..\"	To change the default prompt.
+#	-DFLOATS	To turn on support for inexact numbers.
+#	-DSINGLES	To use single-precision floats (if a float is
+#			the same size as a long).
+#	-DSINGLESONLY	To make all inexact real numbers to be single
+#			precision.  Only useful if SINGLES is also
+#			defined.
+#	-DGC_FREE_SEGMENTS
+#			To have all segments of unused heap be freed
+#			up after garbage collection.  Do not define if
+#			you never want the heap to shrink.
+#	-DTICKS		If you want the ticks and ticks-interrupt
+#			functions defined.
+#	-DBRACKETS_AS_PARENS
+#			To have square brackets read as parentheses
+#			in forms.
+#	-DMEMOIZE_LOCALS To speed up most local variable references.
+#			You will need to remove this and recompile
+#			eval.c if you use very large or deep
+#			environments (more than 4095 bound variables
+#			in one procedure).
+#	-DENGNOT	To use engineering notation instead of
+#			scientific notation.
+#	-DSICP		To make SCM more compatible with the Scheme used
+#			in Abelson & Sussman's book.
+#	-DSTACK_LIMIT	To limit the maximum growth of the stack (you
+#			almost certainly don't want this).
+# See also `scmconfig.h' and `scmfig.h'.
+defines = @DEFS@ \
+	-DFLOATS -DIO_EXTENSIONS -DMEMOIZE_LOCALS -DGC_FREE_SEGMENTS
+
+# If you are using user extension files, change INITS and FINALS
+# below.  INITS makes up the initialization calls for user extension
+# files.  FINALS defines the finalization calls for user extension
+# files.
+
+# File	INITS		FINALS		functions defined
+#
+# sc2.c	init_sc2\(\)			substring-move-left!,
+#					substring-move-right!,
+#					substring-fill!, append!, last-pair
+# rgx.c	init_rgx\(\)			regcomp, regexec (POSIX)
+# crs.c	init_curses\(\) lendwin\(\)	... lots ...
+
+INITS = -DINITS=init_sc2\(\)\;
+FINALS = -DFINALS=\;
+
+# If you are using rgx.c, set the next line to point to the include
+# directory where your POSIX regexp include files live (if you are using
+# GNU regex).
+# RGXFLAGS = -I/archive/regex-0.11/
+
+# If your system needs extra libraries loaded in, define them here.
+#	-lm		For floating point math (needed).
+#	-lcurses	For crs.c extensions.
+#	-lncurses	For curses on Linux (curses has bugs).
+#	-lterm{cap,lib}	May be required for curses support.
+#	-lregex		For POSIX regexp support (rgx.c).
+LOADLIBES = @LIBS@ -lm
+
+# Any extra object files your system needs.
+extras = @LIBOBJS@
+
+# Common prefix for machine-independent installed files.
+prefix = /usr/local
+# Common prefix for machine-dependent installed files.
+exec_prefix = $(prefix)
+
+# Name under which to install SCM.
+instname = scm
+# Directory to install `scm' in.
+bindir = $(exec_prefix)/bin
+# Directory in which to install Init.scm, COPYING, and Transcen.scm.
+libdir = $(exec_prefix)/lib/scm
+# Directory to search by default for included makefiles.
+includedir = $(prefix)/include
+# Directory to install the Info files in.
+infodir = $(prefix)/info
+# Directory to install the man page in.
+mandir = $(prefix)/man/man$(manext)
+# Number to put on the man page filename.
+manext = 1
+# Directory to perform pre-install tests in.
+testdir = $(srcdir)
+
+# Program to install `scm'.
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+# Program to install the man page.
+INSTALL_DATA = @INSTALL_DATA@
+# Generic install program.
+INSTALL = @INSTALL@
+
+# Program to format Texinfo source into Info files.
+MAKEINFO = makeinfo
+# Program to format Texinfo source into DVI files.
+TEXI2DVI = texi2dvi
+
+# Programs to make tags files.
+ETAGS = etags
+CTAGS = ctags -tw
+
+# You should not need to change below this line.
+
+SHELL = /bin/sh
+DFLAG = -DIMPLINIT=\"$(libdir)/Init.scm\"
+TDFLAG = -DIMPLINIT=\"$(testdir)/Init.scm\"
+# nunix = nonunix
+nunix = $(srcdir)
+# examples = examples
+examples = $(srcdir)
+ffiles = time.o repl.o fscl.o sys.o feval.o subr.o sc2.o funif.o #rgx.o
+fifiles = time.o repl.o iscm.o fscl.o sys.o feval.o subr.o sc2.o funif.o #rgx.o
+efiles = time.o repl.o escl.o sys.o eeval.o subr.o sc2.o eunif.o #rgx.o
+cfiles = $(srcdir)/scm.c $(srcdir)/time.c $(srcdir)/repl.c \
+	$(srcdir)/scl.c $(srcdir)/sys.c $(srcdir)/eval.c \
+	$(srcdir)/subr.c $(srcdir)/sc2.c $(srcdir)/unif.c \
+	$(srcdir)/rgx.c $(srcdir)/crs.c $(srcdir)/dynl.c
+hfiles = $(srcdir)/scm.h $(srcdir)/scmfig.h scmconfig.h \
+	$(srcdir)/setjump.h $(srcdir)/patchlvl.h
+ifiles = Init.scm Transcen.scm
+tfiles = $(examples)/test.scm $(examples)/example.scm \
+	$(examples)/pi.scm $(examples)/pi.c $(examples)/split.scm
+dfiles = $(srcdir)/README $(srcdir)/COPYING $(srcdir)/scm.1 \
+	$(srcdir)/QUICKREF $(srcdir)/MANUAL $(srcdir)/ChangeLog \
+	$(srcdir)/code.doc $(srcdir)/ANNOUNCE
+mfiles = Makefile $(nunix)/makefile.msc $(nunix)/makefile.bor \
+	$(nunix)/makefile.tur $(nunix)/makefile.djg \
+	$(nunix)/makefile.emx $(nunix)/makefile.qc \
+	$(nunix)/compile.amiga $(nunix)/link.amiga \
+	$(nunix)/makefile.aztec $(nunix)/makefile.ast \
+	$(nunix)/makefile.prj $(nunix)/dmakefile \
+	$(nunix)/makefile.wcc
+vfiles = $(nunix)/setjump.mar $(nunix)/VMSBUILD.COM $(nunix)/VMSGCC.COM
+afiles = $(dfiles) $(cfiles) $(hfiles) $(ifiles) $(tfiles) $(mfiles) $(vfiles)
+
+.SUFFIXES:
+.SUFFIXES: .o .c .h .ps .dvi .info .texinfo .scm
+
+.PHONY: all
+all: scm
+
+# -DINITS= the initialization calls for user extension files.
+# -DFINALS= the finalialization calls for user extension files.
+dbscm: escm.a sc2.o $(srcdir)/../wb/db.a $(srcdir)/scm.c $(srcdir)/scm.h \
+		$(srcdir)/scmfig.h $(srcdir)/patchlvl.h Makefile
+	$(CC) -o dbscm $(CFLAGS) $(INITS)init_db\(\)\;init_rgx\(\) \
+		$(FINALS)final_db\(\) $(defines) $(srcdir)/scm.c \
+		escm.a $(srcdir)/../wb/db.a $(LOADLIBES) $(extras)
+	rm escm.a
+curscm: escm.a crs.o
+	$(CC) -o curscm $(CFLAGS) $(INITS)init_curses\(\)\;init_rgx\(\) \
+		$(FINALS)lendwin\(\) $(srcdir)/scm.c crs.o escm.a -lcurses \
+		$(LOADLIBES) $(extras)
+	rm escm.a
+dscm: dscm.a main.o
+	$(CC) -o dscm $(CFLAGS) main.o -ldld
+dscm.a: $(efiles) Makefile dynl.o $(srcdir)/scm.c
+	$(CC) $(CFLAGS) -DRTL $(INITS)init_dynl\(\) -c $(srcdir)/scm.c
+	ar crvs dscm.a scm.o dynl.o $(efiles) $(LOADLIBES)
+dynl.o: $(srcdir)/dynl.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		Makefile
+	$(CC) $(CFLAGS) -DDLD -DRTL -c $(srcdir)/dynl.c
+
+instscm: $(fifiles)
+	$(CC) -o instscm $(fifiles) $(LOADLIBES) $(extras)
+
+scm: $(ffiles) fscm.o
+	$(CC) -o scm $(ffiles) fscm.o $(LOADLIBES) $(extras)
+fscm.o: $(srcdir)/scm.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h $(srcdir)/patchlvl.h
+	$(CC) $(CFLAGS) $(TDFLAG) $(defines) -c $(FFLAGS) $(INITS) \
+		$(FINALS) $(srcdir)/scm.c
+	mv scm.o fscm.o
+
+iscm.o: $(srcdir)/scm.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h $(srcdir)/patchlvl.h
+	$(CC) $(CFLAGS) $(DFLAG) $(defines) -c $(FFLAGS) $(INITS) \
+		$(FINALS) $(srcdir)/scm.c
+	mv scm.o iscm.o
+
+fscl.o: $(srcdir)/scl.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(FFLAGS) $(srcdir)/scl.c
+	mv scl.o fscl.o
+feval.o: $(srcdir)/eval.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(FFLAGS) $(srcdir)/eval.c
+	mv eval.o feval.o
+funif.o: $(srcdir)/unif.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(FFLAGS) $(srcdir)/unif.c
+	mv unif.o funif.o
+
+escm: $(efiles) escm.o
+	$(CC) -o escm $(efiles) escm.o $(LOADLIBES) $(extras)
+escm.o: $(srcdir)/scm.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h $(srcdir)/patchlvl.h
+	$(CC) $(CFLAGS) $(defines) -c $(INITS) $(FINALS) $(srcdir)/scm.c
+	mv scm.o escm.o
+escl.o: $(srcdir)/scl.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(srcdir)/scl.c
+	mv scl.o escl.o
+eeval.o: $(srcdir)/eval.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(srcdir)/eval.c
+	mv eval.o eeval.o
+eunif.o: $(srcdir)/unif.c $(srcdir)/scm.h scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c unif.c
+	mv unif.o eunif.o
+
+repl.o: $(srcdir)/repl.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		$(srcdir)/setjump.h scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(TDFLAG) $(srcdir)/repl.c
+sys.o: $(srcdir)/sys.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		$(srcdir)/setjump.h scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(srcdir)/sys.c
+time.o: $(srcdir)/time.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(srcdir)/time.c
+subr.o: $(srcdir)/subr.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(srcdir)/subr.c
+sc2.o: $(srcdir)/sc2.c $(srcdir)/scm.h scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(srcdir)/sc2.c
+rgx.o: $(srcdir)/rgx.c $(srcdir)/scm.h Makefile scmconfig.h
+	$(CC) $(CFLAGS) $(defines) $(RGXFLAGS) -c rgx.c
+crs.o: $(srcdir)/crs.c $(srcdir)/scm.h scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c crs.c
+
+both: scm escm
+
+$(srcdir)/proto.h: $(cfiles)
+	rm -f $(srcdir)/proto.h
+	mkproto $(cfiles) > $(srcdir)/proto.h
+
+libscm.a: rtlscm.o $(ffiles)
+	rm -f libscm.a
+	ar rc libscm.a rtlscm.o $(ffiles)
+	$(RANLIB) libscm.a
+
+rtlscm.o: $(srcdir)/scm.c $(srcdir)/scm.h $(srcdir)/scmfig.h \
+		$(srcdir)/patchlvl.h scmconfig.h
+	$(CC) $(CFLAGS) $(defines) -c $(FFLAGS) -DRTL $(INITS)init_user_scm\(\) \
+	$(FINALS) $(srcdir)/scm.c
+	mv scm.o rtlscm.o
+
+.PHONY: install installdirs
+install: installdirs \
+	$(bindir)/$(instname) $(mandir)/$(instname).$(manext) \
+	$(libdir)/Init.scm $(libdir)/Transcen.scm $(libdir)/COPYING
+
+installdirs:
+	$(SHELL) ${srcdir}/mkinstalldirs $(bindir) $(infodir) \
+		$(mandir) $(libdir)
+
+$(bindir)/$(instname): instscm
+	$(INSTALL_PROGRAM) instscm $@.new
+# Some systems can't deal with renaming onto a running binary.
+	-rm -f $@.old
+	-mv $@ $@.old
+	mv $@.new $@
+
+$(mandir)/$(instname).$(manext): $(srcdir)/scm.1
+	$(INSTALL_DATA) $(srcdir)/scm.1 $@
+
+$(libdir)/Init.scm: $(srcdir)/Init.scm
+	$(INSTALL_DATA) $(srcdir)/Init.scm $@
+
+$(libdir)/Transcen.scm: $(srcdir)/Transcen.scm
+	$(INSTALL_DATA) $(srcdir)/Transcen.scm $@
+
+$(libdir)/COPYING: $(srcdir)/COPYING
+	$(INSTALL_DATA) $(srcdir)/COPYING $@
+
+.PHONY: tar shar dclshar com zip pubzip
+tar: scm.tar
+shar: scm.shar
+dclshar: scm.com
+com: scm.com
+zip: scm.zip
+scm.tar: temp/scm
+	cd temp; tar chf ../scm.tar scm
+	chmod 664 scm.tar
+scm.shar: temp/scm
+	cd temp; shar scm >../scm.shar
+	chmod 664 scm.shar
+scm.com: temp/scm
+	cd temp; dclshar scm >../scm.com
+	chmod 664 scm.com
+scm.zip: temp/scm
+	cd temp; zip -r ../scm.zip scm
+	chmod 664 scm.zip
+pubzip: temp/scm
+	cd temp; zip -ru ../../pub/scm.zip scm
+	chmod 664 ../pub/scm.zip
+
+temp/scm: $(afiles)
+	-rm -rf temp
+	mkdir temp
+	mkdir temp/scm
+	ln $(afiles) temp/scm
+
+.PHONY: dist tar.Z tar.gz shar.Z
+dist: tar.gz
+tar.Z: scm.tar.Z
+tar.gz: scm.tar.gz
+shar.Z: scm.shar.Z
+scm.tar.Z: scm.tar
+	-rm -f scm.tar.Z
+	compress scm.tar
+	chmod 664 scm.tar.Z
+scm.tar.gz: scm.tar
+	-rm -f scm.tar.gz
+	gzip scm.tar
+	chmod 664 scm.tar.gz
+scm.shar.Z: scm.shar
+	-rm -f scm.shar.Z
+	compress scm.shar
+	chmod 664 scm.shar.Z
+
+.PHONY: pubdiffs distdiffs
+pubdiffs: temp/scm
+	mv temp/scm temp/nscm
+	cd temp;unzip ../../pub/scm.zip
+	-rm -f scm.diffs
+	-diff -c temp/scm temp/nscm > scm.diffs
+	-rm -rf temp
+	ls -l scm.diffs
+distdiffs: temp/scm
+	mv temp/scm temp/nscm
+	cd temp;zcat ../../dist/scm*.tar.gz | tar xvf -
+	-rm -f scm.pat
+	-diff -c temp/scm temp/nscm > scm.pat
+	-rm -rf temp
+	ls -l scm.pat
+
+.PHONY: checks check echeck
+checks: check echeck
+check: ./scm test.scm
+	echo '(test-sc4)(test-cont)(test-inexact)(gc)(exit (length errs))' \
+	| ./scm test.scm
+echeck: ./escm test.scm
+	echo '(test-sc4)(test-cont)(gc)(exit (length errs))' \
+	| ./escm test.scm
+
+.PHONY: lint
+lint: lints
+lints: $(cfiles) $(hfiles)
+	lint $(CFLAGS) $(cfiles) | tee lints
+#	lint $(CFLAGS) $(cfiles) | tee lintes
+
+# Seds to help find names not unique in first 8 characters (name8s).
+# for BSD nm format
+# SED_TO_STRIP_NM = sed -e '/.*\.o$$/d' -e 's/.* _//' -e 's/.* T //'
+#old, bad for T [^_] on suns: SED_TO_STRIP_NM=sed -e '/.*\.o$$/d' -e 's/.* _//'
+# For a System V nm where plain C identifiers have _ prepended:
+#SED_TO_STRIP_NM = sed -e '/^_[A-Za-z][A-za-z0-9_]*[ 	|].*|extern|!d' -e 's/|/ /g' -e 's/^_//'
+# For a System V nm where plain C identifiers have nothing prepended:
+#SED_TO_STRIP_NM = sed -e '/^[A-Za-z][A-za-z0-9_]*[ 	|].*|extern|!d' -e 's/|/ /g'
+SED_TO_STRIP_NM = :
+
+.PHONY: name8
+name8: name8s
+name8s: scm
+	nm scm |\
+	$(SED_TO_STRIP_NM) |\
+	sort -u|\
+	awk '{	if (substr(l,1,8)==substr($$1,1,8)) {\
+			if (p) print l;\
+			print $$1;p=0;stat=1\
+		}else p=1;\
+		l=$$1\
+	     }END{exit stat}' - |\
+	tee name8s
+
+tagsrcs = $(hfiles) $(cfiles) $(ifiles) $(mfiles) $(vfiles) \
+	MANUAL code.doc README
+TAGS: $(tagsrcs)
+	$(ETAGS) $(tagsrcs)
+tags: $(tagsrcs)
+	$(CTAGS) $(tagsrcs)
+
+.PHONY: clean cleanish realclean
+clean:
+	-rm -f *~ \#* *.o *\# *.orig *.rej a.out core lints tmp*
+	-rm -rf temp hobtemp
+cleanish:
+	-rm -f *~ \#* *\# *.orig *.rej a.out core lints tmp*
+	-rm -rf temp hobtemp
+distclean:
+	-rm -f *~ \#* *.o *\# *.orig *.rej a.out core TAGS lints tmp* \
+		scmconfig.h config.status
+	-rm -rf temp hobtemp
+
+Makefile: config.status $(srcdir)/Makefile.in
+	$(SHELL) config.status
+scmconfig.h: stamp-config ;
+stamp-config: config.status $(srcdir)/scmconfig.h.in
+	$(SHELL) config.status
+	touch stamp-config
+
+configure: configure.in
+	autoconf $(ACFLAGS)
+scmconfig.h.in: configure.in
+	autoheader $(ACFLAGS)
+
+# This tells versions [3.59,3.63) of GNU make not to export all variables.
+.NOEXPORT:
+
+# Automatically generated dependencies will be put at the end of the file.

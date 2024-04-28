@@ -1,0 +1,24 @@
+.SUFFIXES: .c++
+C++ = /mas/potluck/bin/$(MACHTYPE)/g++
+TARGETS = Header2Scheme
+LOCALINCLUDES = -I.
+LLDLIBS = -lg++
+LC++FLAGS = $(LOCALINCLUDES) -g
+H2SOBJS = Header2Scheme.o Header.o Class.o ClassController.o Utilities.o DirectoryTree.o
+
+default all: $(TARGETS)
+
+targets: $(TARGETS)
+
+Header2Scheme: $(H2SOBJS)
+	$(C++) -o $@ $(H2SOBJS) $(LLDLIBS)
+	mv $(H2SOBJS) obj/$(MACHTYPE)
+	mv $@ bin/$(MACHTYPE)
+
+clean:
+	rm -f *.o
+
+.c++.o:
+	$(C++) -c $*.c++ $(LC++FLAGS)
+
+# DO NOT DELETE THIS LINE -- make depend depends on it.

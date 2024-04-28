@@ -1,0 +1,83 @@
+@tab
+SLList
+@etab
+@dec ofstream @0
+<fstream.h>
+@dec fstream @0
+<fstream.h>
+@dec sapply_int @0
+<iomanip.h>
+@dec filebuf @0
+<fstream.h>
+@dec iostream_withassign @0
+<iostream.h>
+@dec __file_s @0
+<stdio.h>
+@dec stdiobuf @0
+<stdiostream.h>
+@dec imanip_long @0
+<iomanip.h>
+@dec oapply_long @0
+<iomanip.h>
+@dec __uint64_t @0
+<sgidefs.h>
+@dec ostream @0
+<iostream.h>
+@dec iomanip_int @0
+<iomanip.h>
+@dec imanip_int @0
+<iomanip.h>
+@dec sapply_long @0
+<iomanip.h>
+@dec smanip_int @0
+<iomanip.h>
+@dec oapply_int @0
+<iomanip.h>
+@dec istream @0
+<iostream.h>
+@dec _h_val @0
+<limits.h>
+@dec ifstream @0
+<fstream.h>
+@dec ostream_withassign @0
+<iostream.h>
+@dec iapply_int @0
+<iomanip.h>
+@dec stdiostream @0
+<stdiostream.h>
+@dec Iostream_init @0
+<iostream.h>
+@dec ioapply_long @0
+<iomanip.h>
+@dec BaseSLNode @0
+"SLList.h"
+@dec istream_withassign @0
+<iostream.h>
+@dec omanip_long @0
+<iomanip.h>
+@dec SLNode @0
+"SLList.h"
+@dec BaseSLList @0
+"SLList.h"
+@dec smanip_long @0
+<iomanip.h>
+@dec iostream @0
+<iostream.h>
+@dec omanip_int @0
+<iomanip.h>
+@dec SLList @0
+"SLList.h"
+@dec fstreambase @0
+<fstream.h>
+@dec ios @0
+<iostream.h>
+@dec iapply_long @0
+<iomanip.h>
+@dec __int64_t @0
+<sgidefs.h>
+@dec iomanip_long @0
+<iomanip.h>
+@dec ioapply_int @0
+<iomanip.h>
+@dec streambuf @0
+<iostream.h>

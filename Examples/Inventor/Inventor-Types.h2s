@@ -1,0 +1,41 @@
+SbBool int OBJECT 0
+SbMat float OBJECT 2 4 4
+u_long int OBJECT 0
+size_t int OBJECT 0
+u_short int OBJECT 0
+ProjectionType enum
+Components enum
+Boolean enum
+TransparencyType enum
+ResetType enum
+Interest enum
+SoButtonEvent::State enum
+SoComplexity::Type enum
+SoCone::Part enum
+SoCylinder::Part enum
+SoDebugError::Severity enum
+SoDrawStyle::Style enum
+SoGLRenderAction::TransparencyType enum
+SoGetBoundingBoxAction::ResetType enum
+SoKeyboardEvent::Key enum
+SoLightModel::Model enum
+SoMaterialBinding::Binding enum
+SoMouseButtonEvent::Button enum
+SoNormalBinding::Binding enum
+SoPickStyle::Style enum
+SoShapeHints::FaceType enum
+SoShapeHints::ShapeType enum
+SoShapeHints::VertexOrdering enum
+SoSpaceballButtonEvent::Button enum
+SoTexture2::Model enum
+SoTexture2::Wrap enum
+SoTextureCoordinateBinding::Binding enum
+SoText3::Part enum
+SoUnits::Units enum
+SoXtFullViewer::BuildFlag enum
+SoXtMaterialEditor::UpdateFrequency enum
+SoXtSpaceball::Mask enum
+SoXtViewer::BufferType enum
+SoXtViewer::DrawStyle enum
+SoXtViewer::DrawType enum
+SoXtViewer::Type enum

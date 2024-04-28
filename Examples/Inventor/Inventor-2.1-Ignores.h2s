@@ -1,0 +1,94 @@
+DIRECTORY /usr/include/Inventor/bundles
+DIRECTORY /usr/include/Inventor/caches
+DIRECTORY /usr/include/Inventor/elements
+FILE /usr/include/Inventor/SbDict.h
+FILE /usr/include/Inventor/SbNameEntry.h
+FILE /usr/include/Inventor/sensors/SoSensorManager.h
+FILE /usr/include/Inventor/misc/SoNormalGenerator.h
+FILE /usr/include/Inventor/engines/SoCalculator.h
+FILE /usr/include/Inventor/engines/SoConcatenate.h
+FILE /usr/include/Inventor/fields/SoMFInt32.h
+FILE /usr/include/Inventor/fields/SoMFUInt32.h
+FILE /usr/include/Inventor/fields/SoSFLong.h
+FILE /usr/include/Inventor/fields/SoSFULong.h
+FILE /usr/include/Inventor/fields/SoSFInt32.h
+FILE /usr/include/Inventor/fields/SoSFUInt32.h
+CLASS SbDictEntry
+CLASS SbIntList
+CLASS SbVec3fList
+CLASS SoActionMethodList
+CLASS SoEnabledElementsList
+CLASS SoEngineOutputData
+CLASS SoFieldData
+CLASS SoAuditorList
+CLASS SoCompactPathList
+CLASS SoNotRec
+CLASS SoNotList
+CLASS SoTempPath
+CLASS SoNodekitCatalogEntry
+CLASS SoVertexPropertyCache
+METHOD SoSensor CONSTRUCTOR
+METHOD SoDataSensor CONSTRUCTOR
+METHOD SoMFBool NAME getValues
+METHOD SoMFBool NAME setValues
+METHOD SoMFBool NAME startEditing
+METHOD SoMFColor NAME getValues
+METHOD SoMFColor NAME setValues
+METHOD SoMFColor NAME setHSVValues
+METHOD SoMFColor NAME startEditing
+METHOD SoMFEngine NAME getValues
+METHOD SoMFEngine NAME setValues
+METHOD SoMFEngine NAME startEditing
+METHOD SoMFEnum NAME getValues
+METHOD SoMFEnum NAME setValues
+METHOD SoMFEnum NAME startEditing
+METHOD SoMFFloat NAME getValues
+METHOD SoMFFloat NAME setValues
+METHOD SoMFFloat NAME startEditing
+METHOD SoMFLong NAME getValues
+METHOD SoMFLong NAME setValues
+METHOD SoMFLong NAME startEditing
+METHOD SoMFMatrix NAME getValues
+METHOD SoMFMatrix NAME setValues
+METHOD SoMFMatrix NAME startEditing
+METHOD SoMFName NAME getValues
+METHOD SoMFName NAME setValues
+METHOD SoMFName NAME startEditing
+METHOD SoMFNode NAME getValues
+METHOD SoMFNode NAME setValues
+METHOD SoMFNode NAME startEditing
+METHOD SoMFPath NAME getValues
+METHOD SoMFPath NAME setValues
+METHOD SoMFPath NAME startEditing
+METHOD SoMFPlane NAME getValues
+METHOD SoMFPlane NAME setValues
+METHOD SoMFPlane NAME startEditing
+METHOD SoMFRotation NAME getValues
+METHOD SoMFRotation NAME setValues
+METHOD SoMFRotation NAME startEditing
+METHOD SoMFShort NAME getValues
+METHOD SoMFShort NAME setValues
+METHOD SoMFShort NAME startEditing
+METHOD SoMFString NAME getValues
+METHOD SoMFString NAME setValues
+METHOD SoMFString NAME startEditing
+METHOD SoMFTime NAME getValues
+METHOD SoMFTime NAME setValues
+METHOD SoMFTime NAME startEditing
+METHOD SoMFULong NAME getValues
+METHOD SoMFULong NAME setValues
+METHOD SoMFULong NAME startEditing
+METHOD SoMFUShort NAME getValues
+METHOD SoMFUShort NAME setValues
+METHOD SoMFUShort NAME startEditing
+METHOD SoMFVec2f NAME getValues
+METHOD SoMFVec2f NAME setValues
+METHOD SoMFVec2f NAME startEditing
+METHOD SoMFVec3f NAME getValues
+METHOD SoMFVec3f NAME setValues
+METHOD SoMFVec3f NAME startEditing
+METHOD SoMFVec4f NAME getValues
+METHOD SoMFVec4f NAME setValues
+METHOD SoMFVec4f NAME startEditing
+METHOD SoXtRenderArea NAME setColorMap
+METHOD SoXtRenderArea NAME setOverlayColorMap

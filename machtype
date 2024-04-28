@@ -1,0 +1,53 @@
+#!/bin/sh -u
+
+### MACHTYPE: The purpose of this program is to determine what type of computer
+### this program is being run on.  The output of this program can be used to
+### then set one's path, or for other purposes.  At the moment it knows about
+### DECstations, DEC Alpha's, Sun Sparcs, HP 300's, HP 700's, HP 800's, IBM
+### RS6000's, and SGI Mips-based Irises.  'machtype' takes no arguments on the
+### command line.  The current possible outputs for 'machtype' are: "ds",
+### "alpha", "sun4", "rs6000", "next", "hp300", hp700", "hp800", and "unknown".
+
+## Changed to return iris64 for irix 6.2 & 6.5 -- kbrussel 11/98
+
+if uname=`(uname) 2> /dev/null`; then
+   case $uname in
+      AIX)    echo rs6000; exit 0 ;;
+      ULTRIX) echo ds    ; exit 0 ;;
+      SunOS) case `uname -r` in
+                5*) echo sun4-solaris; exit 0 ;;
+                *)  echo sun4; exit 0 ;;
+                esac ;;
+      IRIX) case `uname -r` in
+		6.2) echo iris64; exit 0;;
+		6.5) echo iris64; exit 0;;
+		*) echo iris; exit 0 ;;
+		esac ;;
+      IRIX64)	echo iris64 ; exit 0 ;;
+      HP-UX)  case `uname -m` in
+	         9000/3??) echo hp300;   exit 0 ;;
+		 9000/7??) echo hp700;   exit 0 ;;
+		 9000/8??) echo hp800;   exit 0 ;;
+		 *)	   echo unknown; exit 0 ;;
+		 esac ;;
+      OSF1)   case `uname -m` in
+                 alpha) echo alpha;   exit 0 ;;
+		 *)	echo unknown; exit 0 ;;
+                 esac ;;
+      Linux)  echo i386-linux ; exit 0 ;;
+      esac       
+   fi
+
+/lib/cpp -P << EOF | awk 'BEGIN {FS="\""} NF > 1 {print $2}'
+#ifdef NeXT
+"next"
+#else /* NeXT */
+#ifdef sun
+"sun3"
+#else /* sun */
+"unknown"
+#endif /* sun */
+#endif /* NeXT */
+EOF
+
+exit 0

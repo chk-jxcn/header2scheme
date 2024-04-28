@@ -1,0 +1,757 @@
+Documentation for Header2Scheme version 1.4		Kenneth B. Russell
+November, 1998						kbrussel@media.mit.edu
+------
+
+Contents
+
+	i.	Version History
+	I.	Description of Header2Scheme
+	II.	Method of Operation
+	III.	Description of Auxiliary Files and Command Line Options
+	IV.	The TypeDefs File
+	V.	The Ignores File
+	VI.	The Opaques File
+	VII.	The Hints File
+	VIII.	The Bases File
+	IX.	The Macros File
+	X.	Creating a Package with Header2Scheme
+	XI.	Scheme Syntax for Header2Scheme Packages
+	XII.	Type Conversions Between Scheme and C++
+	XIII.	Type Checking and Mutation
+	XIV.	Limitations and Bugs
+	XV.	Compilation Hints
+	XVI.	Example of Header2Scheme in Action
+
+---
+Important notes in this document are preceded by "***".
+---
+
+Section i. Version History
+
+1.4
+	- Fixed bugs in generated code for pointers returned from functions.
+	- Added long/short qualifiers in typedefs file for ints and
+doubles, and output them in the argument extraction code so references
+to these types work.
+	- Rewrote the C++ wrappers for the Scheme interpreter so they
+work better; more consistent user interface (prompt is always there
+when interpreter is listening) and more robust (Ctrl-C no longer
+crashes the interpreter).
+
+1.3
+	- Changed outputted Makefile structure to make it more platform
+independent.
+	- Moved resolveTypedefs() call above resolvePointers(). Allows
+correct resolution of user-defined types with respect to pointers.
+	- Added "add_feature" for each package. Within Scheme you can use
+(require '<package-name>) to conditionalize code to work only with
+interpreters extended with certain C++ libraries.
+	- Several changes to SCM extensions: rewrote repl_driver_once*
+procedures to allow C++ to call Scheme to call C++ to call Scheme... . The
+only access that should be made to the interpreter is through the "Scheme"
+class. The SCHEME_SET_GC_BASE macro should be called near the beginning of
+the C++ program using the interpreter as an extension (i.e. not calling the
+full read-eval-print-loop). See the IvySCM package (described at the bottom
+of this document) for an example of this use of SCM.
+
+1.2
+	- Fixed bug in GC routines for C++ objects; forgot to call
+destructor of GC'd object!
+	- Redesigned SMOB allocation for greater than 255 SMOBs. Should
+eliminate all conflicts with SCM internal SMOB types, and fix most random
+memory errors.
+	- Added incremental mode generation of interface code; useful when
+a large C++ class library under development needs a Scheme interface.
+	- Added direct support for enumerated data types.
+	- Added support for arrays of pointers (but not arrays of pointers
+to pointers...)
+	- Fixed bug where "Ivy.h" was hardcoded in in a couple of
+places. Proves that nobody was using this software...
+
+1.1
+	- Garbage collection for C++ objects now works.
+	- Fixed two bugs which caused some accessors for overloaded methods
+to get lost.
+	- Added (void-null) procedure for getting a void-type NULL pointer
+in Scheme when this opaque data type is defined.
+	- Created predicates for all C++ types.
+	- Created general predicate "C++-object?"
+	- Fixed a minor bug that only manifested itself when GC occurred
+during allocation of a C++ object when verbose was greater than 3.
+
+1.0
+	- First public release
+
+---
+
+Section I. Description of Header2Scheme
+
+	There are many reasons one would like an interpreted language
+interface to a program; for debugging, for extensibility, or for rapid
+prototyping. There are some standard choices for interpreted languages,
+such as Tcl, but Tcl has some major disadvantages, among them being its
+slow speed. Scheme is an elegant language which functions well as an
+extension language; however, interfacing it to a C or C++ program often
+requires a large amount of "glue code" to allow C structures to be
+represented (and operated upon) in Scheme.
+
+	Header2Scheme (hereafter referred to as H2S) is a program which
+automatically generates this glue code for an entire directory tree of C++
+classes. This allows rapid interfacing of entire C++ class libraries to
+Scheme.
+
+	H2S works by parsing all header files (.h and .hh) in a supplied
+directory and its sub-directories. It then reconstructs a notion of the
+class hierarchy, and outputs C++ code which, when compiled and linked into
+a Scheme interpreter, implements the backend to a Scheme interface for the
+described classes.
+
+	H2S currently only generates code for Aubrey Jaffer's SCM
+interpreter. I plan to add support for Guile, which is based on SCM. I am
+releasing the source code for H2S in the hope that it will be useful to
+users of the above two systems, and so others can adapt the program to work
+with other Scheme interpreters.
+
+---
+
+Section II. Method of Operation
+
+	H2S is written in C++, with class types designed to embody the
+nature of the problem to be solved. For this reason, there are classes
+such as Header, Class, and Method, each which knows about successively
+lower-level detail about the class library structure.
+	
+	The H2S program operates in two primary stages: parsing and
+compiling. During the parsing stage, a new Header object is created
+for each header file in the directory tree. These objects read in
+their associated files and tokenize them, then parse them line-by-line
+into their associated classes, methods, and class variables.
+
+	Once the classes have been parsed, each class outputs a Scheme
+interface for itself. The fundamental backend for this is actually a
+compiler which knows how to deal with overloaded functions. All class
+variables and methods with optional arguments are converted internally
+into Methods, upon which the compiler operates to generate the
+interface code.
+
+	At this point an object called a ClassController is
+instantiated. The ClassController is used during runtime to determine
+whether it is valid to call a requested member function of a given
+object, as well as to manage some type checking. During the
+preprocessing stage, the ClassController is used to reconstruct the
+class hierarchy described by the classes in the current directory
+tree. It also determines the order in which classes can be added to
+the hierarchy without violating the constraint that all parent classes
+of a given class must be added first. This allows the hierarchy to be
+regenerated in linear time when the Scheme interpreter starts.
+
+	H2S outputs a Makefile and main initialization file for the
+"package" it creates. When the package is compiled, it generates a library
+which can be linked in with the Scheme interpreter; all that needs to be
+done to complete the interfacing of the C++ class library is to link in the
+H2S-generated library and the desired class library with the Scheme
+interpreter during compilation of the interpreter, and to call the
+initialization function for the package during initialization of the
+interpreter.
+
+---
+
+Section III. Description of Auxiliary Files and Command Line Options
+
+	H2S usually requires some assistance from the user in order to
+complete the code generation for an entire class library. In particular,
+there are often some ambiguities regarding pointers which must be
+resolved. For example, a character pointer in C may have one of three
+meanings:
+
+	- pointer to a character object
+	- pointer to a fixed-length character array
+	- pointer to a null-terminated character string
+
+H2S knows how to handle the first two cases for any data type, and the
+third case for the special case of character strings. However, user input
+is required to tell H2S which type of interface code to generate.
+
+	To speed up this process, there are some auxiliary files which can
+be created to give H2S hints about what pointers are always pointers to
+objects in the given class library, and other pieces of information which
+can reduce the amount of user interaction and thus speed up the code
+generation process. These files are:
+
+	- the TypeDefs file
+	- the Ignores file
+	- the Opaques file
+	- the Hints file
+	- the Bases file
+	- the Macros file
+
+These files are described more fully in the following sections.
+
+	The required command line options for H2S are as follows:
+
+	-d <directory name> : absolute or relative path containing the
+header files for the C++ class library to which the interface is being
+generated.
+	-p <package name> : name of the "Package" H2S will generate: see
+below for instances in which this name is used.
+	-v <version number> : version number of this package.
+
+	The optional command line options for H2S are:
+
+	-t <typedef name> : pathname of the TypeDefs file
+	-i <ignores name> : pathname of the Ignores file
+	-o <opaques name> : pathname of the Opaques file
+	-h <hints name> : pathname of the Hints file
+	-b <bases name> : pathname of the Bases file
+	-m <macros name> : pathname of the Macros file
+	-n : turn on incremental mode code generation
+
+Incremental mode code generation may be used when you are developing a
+large C++ class library and need to keep the Scheme interface up to
+date. Rather than regenerating all the interface code (which forces all the
+interface files to be recompiled), you can regenerate the interfaces for
+only those classes whose header files have changed since the last full
+interface code generation. You can NOT add classes to the class hierarchy
+in incremental mode, since it does not regenerate the makefile or the
+package initialization or header files.
+
+---
+
+Section IV. The TypeDefs File
+
+	H2S only fundamentally understands the C++ class structure and the
+nature of overloaded functions. It does not parse typedef clauses or
+enumeration definitions. For this reason, it was necessary to allow H2S to
+know that certain data types which were defined by typedefs rather than by
+class declarations could actually be another kind of data type. This
+information is provided by the TypeDefs file.
+
+	The syntax for each line of the TypeDefs file is:
+
+	<type name> <base type> [OBJECT | POINTER | REFERENCE |
+		REFERENCE_TO_POINTER | POINTER_TO_OBJECT]
+		<number of array dimensions> <array dimensions...>
+
+	As an example, the Open Inventor class library declares the data
+type SbBool to be an integer in a typedef. The corresponding line in the
+typedefs file is
+
+	SbBool int OBJECT 0
+
+There is another typedef which calls a 4x4 array of floats an SbMat:
+
+	typedef float SbMat[4][4];
+
+The corresponding line in the TypeDef file is
+
+	SbMat float OBJECT 2 4 4
+
+The "type of reference" (OBJECT, etc) is currently ignored. This means that
+H2S could not express the following typedef:
+
+	typedef void* Pointer;
+
+	In version 1.2, Header2Scheme supports TypeDefs of enumerated data
+types as a special case. The syntax in the TypeDefs file is as follows:
+
+	<type name> [enum | nonscoped_enum]
+
+If your enumerated data type is defined and used inside your class, define
+it as just the type name (that is, not scoped with the class name). If it
+is defined within one class and used within another, define two enum
+typedefs, one with <class name>::<enum type>, and one with <enum type>. If
+it is not defined within any class, define it as nonscoped_enum.
+
+	Enumerated data types are represented as immediate integers in
+SCM. You should define an initialization file for your enumerated data
+types which binds the correct values to the names of your enumerated
+elements, as in the following example:
+
+	(define MyClass::FIRST_ENUM 0)
+	(define MyClass::SECOND_ENUM 1)
+
+	Note that H2S will almost certainly not convert pointers to
+enumerated data types properly.
+
+---
+
+Section V. The Ignores File
+
+	The Ignores file allows the user to specify portions of the
+class hierarchy or directory tree which will be selectively
+ignored. The following sections are ignorable:
+
+	- a subdirectory of the directory tree
+	- a file within the directory tree
+	- a class within a header file
+	- a method within a given class with a given name
+
+Currently it is not possible to ignore one instance of an overloaded
+function.
+
+	The syntax for the Ignores file is as follows:
+
+	DIRECTORY <directory name>
+	FILE <full or relative pathname of file,
+	      depending on the specification of the directory
+	      currently being traversed>
+	CLASS <class name>
+	METHOD <class name> CONSTRUCTOR
+	METHOD <class name> NAME <method name>
+
+---
+
+Section VI. The Opaques File
+
+	The Opaques file is used to specify certain data types (i.e. very
+complicated C data structures) as "opaque" to the Scheme interpreter. These
+data types can be used as return values from and arguments to functions,
+but have no member functions. As an example, several of the X data types
+were declared to be "opaque" during the conversion of the Open Inventor Xt
+classes.
+
+	The syntax of the Opaques file is as follows:
+
+	<type name> <path name of header file where this type is declared>
+		<1|0, depending on whether this data type only exists as
+		 a pointer (example: a function pointer)>
+
+Some examples:
+
+	FILE /usr/include/stdio.h 0
+	fd_set /usr/include/sys/types.h 0
+	timeval /usr/include/sys/time.h 0
+	
+*** Note that in order to be able to pass around void *'s, the following
+ignore must be included: 
+
+	void /usr/include/stdio.h 1
+
+*** Further note that voids are a "special case". When this opaque data
+type is defined, the code produced for it will enable the Scheme procedure
+"void-null", which returns a void-typed NULL pointer to Scheme. This null
+pointer can be used in conjunction with the equal? predicate and the type
+casting procedures, described below.
+
+---
+
+Section VII. The Hints File
+
+	The Hints file allows the user to specify that a certain class,
+when encountered as a pointer, always indicates either a pointer to an
+object, a pointer to a fixed length array, or (in the case of chars) a
+pointer to a null-terminated string.
+
+	The syntax of the Hints file is as follows:
+
+	<type name> <reference type> <user responses...>
+
+The "reference type" field can be one of the following:
+
+	POINTER
+	REFERENCE_TO_POINTER
+	POINTER_TO_OBJECT
+
+	The first element in the "user responses" field indicates the
+"depth" of the pointer; i.e. a pointer to a pointer to an object. Currently
+only a depth of 1 is supported. The second element in the "user responses"
+field indicates the user choice which would have been selected had H2S
+requested ambiguity resolution of this pointer. Valid values are 1 when
+indicating a pointer to an object, and 3 when indicating a character
+string.
+
+	The usefulness of the Hints file is apparent when a directory tree
+contains many classes which pass pointers of a common base type around, and
+these pointers always indicate pointers to objects. Another case where the
+Hints file is useful is when function pointers are being passed around;
+these can (obviously) only exist as pointers, but H2S does not recognize
+this without a hint.
+
+Some examples of Hints used in the Open Inventor class library conversion:
+
+	char POINTER 1 3
+	char REFERENCE_TO_POINTER 1 3
+	void POINTER 1 1
+	void REFERENCE_TO_POINTER 1 1
+	fd_set POINTER 1 1
+	FILE POINTER 1 1
+	SoDragger POINTER 1 1
+	SoDraggerCB POINTER 1 1
+
+---
+
+Section VIII. The Bases File
+
+	The Bases file allows the user to specify certain classes which
+should be treated as "base classes" for the current run of H2S, so the
+class hierarchy can be successfully reconstructed. This is useful when an
+interface has been created for a library of base classes and an interface
+to another library, solely dependent upon the first, is being generated; in
+these cases, the base classes of the new library (which themselves may be
+subclasses of classes in the first library) should be declared in the Bases
+file.
+
+	The syntax of the Bases file is as follows:
+	
+	<class name 1>
+	.
+	.
+	.
+	<class name n>
+
+	An example of a situation in which the Bases file would be used is
+the following:
+
+	The Open Inventor class library defines the type "SoNode". Another
+library (external to Inventor) creates a subclass of SoNode, called
+"MyNode". When converting this new library, "MyNode" should be added to the
+Bases file, assuming the Scheme interface to the Open Inventor class
+library exists.
+
+---
+
+Section IX. The Macros File
+
+	H2S currently does not run any of the header files it reads in
+through cpp, because doing so can cause multiple instances of classes to be
+recognized internally, and this is not yet supported. However, some class
+libraries rely upon code generating preprocessor macros to implement
+standard functions; an example of this is the SoField classes in Open
+Inventor. In order for a proper Scheme interface to the class to be
+generated, these macros must be expanded.
+
+	To allow this expansion, H2S uses m4, a standard macros
+package. The user can specify a file containing the macros to be expanded,
+and H2S will pipe all the header files for the given directory through m4
+with those macros defined.
+
+	The syntax for the macros file is the following. Given a C macro:
+
+	#define CODE_EXPANSION(x,y,z)	void x(y z)
+
+this becomes an m4 macro:
+
+	define(CODE_EXPANSION,void $1($2 $3))
+
+	This new macro is then inserted into the Macros file.
+
+	A sample complete Macros file might be
+
+	undefine(`index')
+	changequote(xyzzy,yzzyx)
+	define(CODE_EXPANSION_1,void $1($2 $3))
+	define(CODE_EXPANSION_2,protected: $1 $2 public: $1 $3)
+
+***	The undefine(`index') definition undefines the "index" macro built into
+m4. This is necessary when a variable or method is named "index" in a
+header file. The changequote command removes m4's dependencies on the
+backquote and forward quote, which can cause problems in some C++ code.
+
+---
+
+Section X. Creating a Package with Header2Scheme
+
+	The process of creating a Scheme interface to a class library using
+Header2Scheme follows this approximate, iterative development cycle:
+
+	- generate Ignores for undesired (and unconvertable) methods,
+classes and files
+	- generate TypeDefs for typedefs and enumerations
+	- generate Opaques for unconvertable data types
+	- generate Hints for classes which always are pointers to objects
+when their variable names appear preceded by a "*"
+	- create Bases and Macros files if necessary
+
+	It is usually necessary to repeatedly run H2S on the directory of
+include files to observe what additions to the above files still need to be
+made.
+
+	The required command line options for H2S are as follows:
+
+	-d <directory name> : absolute or relative path containing the
+header files for the C++ class library to which the interface is being
+generated.
+	-p <package name> : name of the "Package" H2S will generate: see
+below for instances in which this name is used.
+	-v <version number> : version number of this package.
+
+	The optional command line options for H2S are:
+
+	-t <typedef name> : pathname of the TypeDefs file
+	-i <ignores name> : pathname of the Ignores file
+	-o <opaques name> : pathname of the Opaques file
+	-h <hints name> : pathname of the Hints file
+	-b <bases name> : pathname of the Bases file
+	-m <macros name> : pathname of the Macros file
+	-n : turn on incremental mode code generation
+
+	The most common error that appears during the development cycle is
+
+DirectoryTree::resolveDependency: Unable to find the file where class "foo"
+is declared
+
+	This indicates that H2S does not have any information about class
+"foo", given the current class hierarchy it is traversing. There are
+usually three possible reasons for this:
+
+	1. The "class" is actually a typedef or enumeration in a certain
+file, and needs to be added to the Types file.
+	2. The "class" is a C data type defined in another file, and needs
+to be added to the Opaques file.
+***	3. The class is declared in another class hierarchy for which a
+Scheme interface has already been converted, and the error can be
+ignored. However, the directory of the previous class hierararchy's
+interface must be added to the include line of the current interface's
+Makefile.
+
+	Once all the errors have been resolved, the only user input that
+should be necessary is resolution of pointers to fixed-length arrays. H2S
+will then generate (*** into the current directory) the following:
+
+	- One .c++ and .h file per class, defining the Scheme interface for
+this class.
+	- <package name>.c++ and <package name>.h, defining the initialization
+function (init_<package name>()) for this package.
+	- a Makefile which creates lib<package name>.a.
+
+	Once lib<package name>.a has been created, all that is necessary to
+complete the interface to SCM (currently the only supported Scheme) is:
+
+	- add the line "#include <package name>.h" to scm.c++
+	- add the function call init_<package name>() sometime after
+init_SCM_Global_Dispatch()
+	- add the directory where the package has been created to the
+Include and Library paths in the SCM Makefile
+	- recompile SCM.
+	
+	Note that within SCM the feature <package name> will be added when
+the initialization function of this package is called. You can thereby
+conditionalize code to only work with an interpreter extended with a
+certain set of C++ class libraries. For example, the Ivy package (described
+below) defines the feature "ivy", so the Scheme initialization file for
+this package (which defines useful wrapper functions) has the following at
+the top:
+
+		(require 'ivy)
+
+	When creating a package with Header2Scheme, the following directory
+structure is recommended:
+
+	TopLevelDirectory
+		LinkedList
+		SCM
+		NewPackage
+
+This allows relative links between SCM and the package "NewPackage" and
+makes generation of the interface easier, since it takes place within its
+own directory. In addition, H2S makes the assumption that the SCM directory
+and the "NewPackage" directories are in the same top level directory in the
+creation of its Makefile, so changing the directory structure from the
+above requires modification to the Makefile generated by H2S.
+
+---
+
+XI. Scheme Syntax for Header2Scheme Packages
+
+Given a C++ class:
+	class Foo {
+	public:
+		int memberFunction();
+		Yabba *class_variable;
+	};
+
+The Scheme interface becomes
+	(define my-foo (new-foo))
+	(define my-int (-> my-foo 'memberfunction))
+	(define my-yabba (-> my-foo 'class_variable))
+
+An alternative calling interface is
+	(foo::memberfunction my-foo)
+	(foo::class_variable my-foo)
+
+	Overloaded functions are handled transparently in the
+H2S-generated backend, which checks the incoming arguments from Scheme
+and attempts to find the desired member function.
+
+	Operator functions are called in the same fashion as other
+functions, with two exceptions:
+
+	> (define vec1 (new-sbvec3f 1 2 3))
+	> (define vec2 (new-sbvec3f 2 3 4))
+	> (define my-vec3 (-> vec1 'operator+ vec2))
+	> (-> my-vec3 'getvalue)
+	#(3.0 5.0 7.0)
+
+*** operator() and operator[] have been renamed to operator-parens and
+operator-brackets by necessity.
+
+	Class variables which are basic C data types most likely can
+not be mutated. This is not a problem with Open Inventor, however,
+where each field is actually a class having set and get functions.
+
+	Each class has a type casting function defined which returns a new
+Scheme object with the desired type tag. As an example:
+
+	> (define my-list (new-sbplist))
+	> (define my-sep (new-soseparator))
+	> (-> my-list 'append my-sep)
+	ERROR: SCM_SbPList_append: Wrong type in arg2 (see errobj)
+	> (-> my-list 'append (void-cast my-sep))
+	>
+
+By using the type casting functions, you can shoot yourself in the foot just
+as effectively as you could otherwise do in C.
+
+	Each class, in addition, has a predicate procedure defined, as in
+(Foo? my-foo). This predicate will return #t if the argument is a Foo or a
+subclass of Foo, and false otherwise. There is also a global predicate,
+"C++-object?", which returns #t if its argument is a C++ object, and #f
+otherwise. This predicate can be used to define a consistent syntax for
+dealing with Scheme objects (under any one of several Scheme object
+systems) and C++ objects.
+
+---
+
+Section XII. Type Conversions Between Scheme and C++
+
+	Header2Scheme generates code to convert fixed-length C arrays
+into Scheme vectors and back. (See the section below on pointers and
+references.)  Strings have essentially the same representation in
+Scheme and C, modulo a type tag in Scheme. Floats, ints, and
+characters are likewise similarly represented and have all the
+necessary conversion code generated by Header2Scheme.
+
+	More sophisticated C data structures (i.e. the ones which
+Header2Scheme is designed to provide access to) are represented in the
+Scheme backend as pointers with a type tag.
+
+---
+
+Section XIII. Type Checking and Mutation
+
+	One of the most elegant aspects of Scheme is that there is no type
+checking; everything is considered to be "data". Because Header2Scheme
+fundamentally is dealing with C, however, it necessarily enforces some type
+checking.
+
+	When a member function of a class is called via Scheme, the code
+that Header2Scheme produced checks the Scheme arguments' types and attempts
+to find the appropriate (possibly overloaded) C++ function. If one can't be
+found, the interpreter produces a wrong type error (as opposed to a
+segmentation fault). Otherwise, the arguments are converted to their C
+equivalents, the function is called, and the return value, if any, is
+converted to Scheme format and returned to the interpreter.
+
+	In Scheme, all arguments to functions are passed by
+value. Unfortunately, C++ allows passing pointers and references to
+variables during function calls, and many C functions would become unusable
+if they were unable to side-effect their parameters. Because of this, the
+backend that Header2Scheme generates allows side-effects to propagate,
+where possible, to all arguments that are passed by reference (either via a
+pointer or a reference). (Scheme integers and characters can not be mutated
+because they are always passed by value.) It should be noted that this can
+cause unpleasant and unexpected effects in code:
+
+	class SbVec3f {
+		(...)
+		void getValue(float &x, float &y, float &z);
+		(...)
+	};
+
+
+	> (define x 0.0)
+	> (define y 0.0)
+	> (define z 0.0)
+	> (define my-list (list x y z))
+	> my-list
+	(0.0 0.0 0.0)
+	> (define my-vec (new-SbVec3f 3 4 5))
+	> (-> my-vec 'getValue x y z)
+	> x
+	3.0
+	> y
+	4.0
+	> z
+	5.0
+	> my-list
+	#(3.0 4.0 5.0)	
+
+If, on the other hand, the command which had mutated x had been the
+standard Scheme
+
+	> (set! x 2.0)
+	> my-list
+	#(0.0 0.0 0.0)
+
+my-list is (correctly) not mutated in this example.
+
+---
+
+Section XIV. Limitations and Bugs
+
+	Header2Scheme was not designed to deal with very complicated C data
+structures or C++ constructs. For this reason, it does not understand the
+following:
+
+	- template classes (either declarations or as return types
+from/arguments to functions)
+	- variable-length arrays
+
+	As of version 1.2 H2S knows how to convert arrays of pointers
+between Scheme and C++; it does so in a similar way to the conversion of
+arrays of objects.
+
+	H2S currently does not know how to convert a pointer to a pointer,
+so if you have declared in your class
+
+	float **foo;
+
+it will automatically assume foo is a 2-dimensional array and ask you for
+bounds on the array indices.
+
+	H2S will currently choke on C preprocessor code inside a class
+definition.
+
+	H2S may not know how to create conversion code for certain types (I
+believe a fixed-length array of characters is one example), and will create
+incomplete code instead. Please send examples of header files which cause
+this problem to the author so they can be added to the next release.
+
+---
+
+Section XV. Compilation Hints
+
+	To compile H2S on a non-SGI platform using g++, perform the
+following steps:
+
+	1. Modify the Makefile.g++ to point the variable "C++" to your
+version of g++.
+	2. setenv MACHTYPE `machtype`
+	3. cp Makefile.hp700 Makefile.$MACHTYPE
+	4. mkdir bin/$MACHTYPE obj/$MACHTYPE
+	5. domake
+
+To compile H2S on the SGI using SGI's CC compiler,
+
+	1. setenv MACHTYPE `machtype`
+	2. domake
+
+	The Header2Scheme distribution includes a modified version of SCM
+4e1 which contains the hooks to allow the interfacing of the backends which
+H2S generates to SCM. If you wish to obtain the original version and make
+these changes yourself, please see the file README.MODIFICATIONS in the SCM
+directory. 
+
+---
+
+Section XVI. Example of Header2Scheme in Action
+
+	One example of a C++ class library for which a Scheme interface has
+been generated using Header2Scheme is Open Inventor. This package is called
+Ivy, and is available from the Ivy home page:
+
+	http://www-white.media.mit.edu/~kbrussel/Ivy/
+
+	The requisite Header2Scheme data files used during this library's
+conversion are in the subdirectory Examples/Inventor of the
+Header2Scheme distribution.

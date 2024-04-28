@@ -1,0 +1,172 @@
+include $(ROOT)/usr/include/make/commondefs
+
+LOCALINCLUDES = -I./LinkedList
+LLDLIBS = -L./LinkedList/lib/iris/CC -lSLList
+LC++FLAGS= -g -n32 $(LOCALINCLUDES)
+H2SOBJS = Header2Scheme.o Header.o Class.o ClassController.o Utilities.o DirectoryTree.o
+TARGETS=Header2Scheme
+
+targets: $(TARGETS)
+
+Header2Scheme: $(H2SOBJS)
+	$(C++) -n32 -o $@ $(H2SOBJS) $(LLDLIBS)
+	mv $(H2SOBJS) obj/$(MACHTYPE)
+	mv $@ bin/$(MACHTYPE)
+
+cbgen: cbgen.o
+	$(C++) -n32 -o $@ cbgen.o $(LLDLIBS)
+
+athenainstall:
+	cd IvySCM-Inv-2.0; \
+	cp ivyscm ivyscm_stripped; \
+	strip ivyscm_stripped; \
+	mv ivyscm_stripped ../Athena/ivyscm; \
+	cp *.scm ../Athena/; \
+	cp ../SCM/Init.scm.athena ../Athena/Init.scm; \
+	cp ../README.Athena ../Athena/; \
+	cp ../Ivy.doc ../Athena/; \
+	cp ../Mentor/*.scm ../Athena/Mentor/; \
+	cp ../Mentor/*.iv ../Athena/Mentor/; \
+	cp ../Mentor/*.rgb ../Athena/Mentor/;
+
+ivydist:
+	rm -rf Distribution/*
+	mkdir -p Distribution/Ivy
+	mkdir -p Distribution/IvyExtras
+	mkdir -p Distribution/IvyExtrasInterface
+	mkdir -p Distribution/IvySCM
+	mkdir -p Distribution/Mentor
+	mkdir -p Distribution/Networking
+	mkdir -p Distribution/SocketMan
+	mkdir -p Distribution/SocketManScheme
+	mkdir -p Distribution/SCM
+	mkdir -p Distribution/bin
+	cp machtype Distribution/
+	cp Ivy/*.c++ Distribution/Ivy/
+	cp Ivy/*.h Distribution/Ivy/
+	cp Ivy/Makefile Distribution/Ivy/
+	cp IvyExtras/*.c++ Distribution/IvyExtras/
+	cp IvyExtras/*.h Distribution/IvyExtras/
+	cp IvyExtras/Makefile Distribution/IvyExtras/
+	cp IvyExtrasInterface/*.c++ Distribution/IvyExtrasInterface/
+	cp IvyExtrasInterface/*.h Distribution/IvyExtrasInterface/
+	cp IvyExtrasInterface/Makefile Distribution/IvyExtrasInterface/
+	cp IvySCM/*.c++ Distribution/IvySCM/
+	cp IvySCM/*.h Distribution/IvySCM/
+	cp IvySCM/Makefile Distribution/IvySCM/
+	if [[ -r IvySCM/ivyscm ]] ; \
+	  then cp IvySCM/ivyscm Distribution/bin/ ; strip Distribution/bin/ivyscm; \
+	fi
+	cp -r LinkedList Distribution/
+	cp Ivy.doc Distribution/
+	cp LICENSE Distribution/
+	cp -r SchemeInitFiles Distribution/
+	rm -rf Distribution/SchemeInitFiles/scm/RCS
+	cp -r Examples Distribution/
+	cp -r elisp Distribution/
+	cp Mentor/*.scm Distribution/Mentor/
+	cp Mentor/*.iv Distribution/Mentor/
+	cp Mentor/*.rgb Distribution/Mentor/
+	cp Networking/*.scm Distribution/Networking/
+	cp -r SocketMan/ Distribution/
+	rm -rf Distribution/SocketMan/RCS
+	rm -rf Distribution/SocketMan/*/RCS
+	cp SocketManScheme/*.c++ Distribution/SocketManScheme/
+	cp SocketManScheme/*.h Distribution/SocketManScheme/
+	cp SocketManScheme/Makefile Distribution/SocketManScheme/
+	cp SCM/*.c Distribution/SCM/
+	cp SCM/*.h Distribution/SCM/
+	cp SCM/*.c++ Distribution/SCM/
+	cp SCM/*.scm Distribution/SCM/
+	cp SCM/ANNOUNCE Distribution/SCM/
+	cp SCM/COPYING Distribution/SCM/
+	cp SCM/ChangeLog Distribution/SCM/
+	cp SCM/MANUAL Distribution/SCM/
+	cp SCM/Makefile Distribution/SCM/
+	cp SCM/Makefile.in Distribution/SCM/
+	cp SCM/QUICKREF Distribution/SCM/
+	cp SCM/README Distribution/SCM/
+	cp SCM/README.MODIFICATIONS Distribution/SCM/
+	cp SCM/README.unix Distribution/SCM/
+	cp SCM/VMSBUILD.COM Distribution/SCM/
+	cp SCM/VMSGCC.COM Distribution/SCM/
+	cp SCM/code.doc Distribution/SCM/
+	cp SCM/compile.amiga Distribution/SCM/
+	cp SCM/configure Distribution/SCM/
+	cp SCM/configure.in Distribution/SCM/
+	cp SCM/dmakefile Distribution/SCM/
+	cp SCM/link.amiga Distribution/SCM/
+	cp SCM/makefile.acorn Distribution/SCM/
+	cp SCM/makefile.ast Distribution/SCM/
+	cp SCM/makefile.aztec Distribution/SCM/
+	cp SCM/makefile.bor Distribution/SCM/
+	cp SCM/makefile.djg Distribution/SCM/
+	cp SCM/makefile.emx Distribution/SCM/
+	cp SCM/makefile.msc Distribution/SCM/
+	cp SCM/makefile.prj Distribution/SCM/
+	cp SCM/makefile.qc Distribution/SCM/
+	cp SCM/makefile.tur Distribution/SCM/
+	cp SCM/makefile.unix Distribution/SCM/
+	cp SCM/makefile.wcc Distribution/SCM/
+	cp SCM/mkinstalldirs Distribution/SCM/
+	cp SCM/scm.1 Distribution/SCM/
+	cp SCM/setjump.mar Distribution/SCM/
+	cp SCM/setjump.s Distribution/SCM/
+	cp -r SCM/Hobbit Distribution/SCM/
+
+h2sdist:
+	rm -rf H2SDist/*
+	mkdir -p H2SDist/Examples/Inventor
+	mkdir -p H2SDist/SCM
+	cp *.h H2SDist/
+	cp *.c++ H2SDist/
+	rm -f H2SDist/cbgen.c++
+	cp Makefile* H2SDist/
+	cp *.h2s H2SDist/Examples/Inventor/
+	cp LICENSE H2SDist/
+	cp machtype H2SDist/
+	cp Header2Scheme.doc H2SDist/
+	cp domake H2SDist/
+	cp mastermake H2SDist/
+	cp -r LinkedList H2SDist/
+	cp SCM/*.c H2SDist/SCM/
+	cp SCM/*.h H2SDist/SCM/
+	cp SCM/*.c++ H2SDist/SCM/
+	cp SCM/*.scm H2SDist/SCM/
+	cp SCM/ANNOUNCE H2SDist/SCM/
+	cp SCM/COPYING H2SDist/SCM/
+	cp SCM/ChangeLog H2SDist/SCM/
+	cp SCM/MANUAL H2SDist/SCM/
+	cp SCM/Makefile H2SDist/SCM/
+	cp SCM/Makefile.in H2SDist/SCM/
+	cp SCM/QUICKREF H2SDist/SCM/
+	cp SCM/README H2SDist/SCM/
+	cp SCM/README.MODIFICATIONS H2SDist/SCM/
+	cp SCM/README.unix H2SDist/SCM/
+	cp SCM/VMSBUILD.COM H2SDist/SCM/
+	cp SCM/VMSGCC.COM H2SDist/SCM/
+	cp SCM/code.doc H2SDist/SCM/
+	cp SCM/compile.amiga H2SDist/SCM/
+	cp SCM/configure H2SDist/SCM/
+	cp SCM/configure.in H2SDist/SCM/
+	cp SCM/dmakefile H2SDist/SCM/
+	cp SCM/link.amiga H2SDist/SCM/
+	cp SCM/makefile.acorn H2SDist/SCM/
+	cp SCM/makefile.ast H2SDist/SCM/
+	cp SCM/makefile.aztec H2SDist/SCM/
+	cp SCM/makefile.bor H2SDist/SCM/
+	cp SCM/makefile.djg H2SDist/SCM/
+	cp SCM/makefile.emx H2SDist/SCM/
+	cp SCM/makefile.msc H2SDist/SCM/
+	cp SCM/makefile.prj H2SDist/SCM/
+	cp SCM/makefile.qc H2SDist/SCM/
+	cp SCM/makefile.tur H2SDist/SCM/
+	cp SCM/makefile.unix H2SDist/SCM/
+	cp SCM/makefile.wcc H2SDist/SCM/
+	cp SCM/mkinstalldirs H2SDist/SCM/
+	cp SCM/scm.1 H2SDist/SCM/
+	cp SCM/setjump.mar H2SDist/SCM/
+	cp SCM/setjump.s H2SDist/SCM/
+
+include $(COMMONRULES)
+# DO NOT DELETE THIS LINE -- make depend depends on it.
